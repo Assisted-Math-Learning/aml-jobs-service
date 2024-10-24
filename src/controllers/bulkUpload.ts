@@ -130,13 +130,13 @@ const handleFailedProcess = async () => {
   const processesInfo = await getProcessMetaData({ status: Status.PROGRESS });
   const { getAllProcess } = processesInfo;
   for (const process of getAllProcess) {
-    await updateProcess(processId, { status: Status.REOPEN });
     const { process_id, file_name, created_at } = process;
     fileName = file_name;
     processId = process_id;
     logger.info(`process reopened for ${process_id}`);
     const timeDifference = Math.floor((Date.now() - created_at.getTime()) / (1000 * 60 * 60));
-    if (timeDifference > reCheckProcessInterval) {
+    if (timeDifference >= reCheckProcessInterval) {
+      await updateProcess(process_id, { status: Status.REOPEN });
       const isSuccessStageProcess = await checkStagingProcess();
       if (!isSuccessStageProcess) {
         await updateProcess(processId, { status: Status.ERROR, error_status: 'errored', error_message: 'The csv Data is invalid format or errored fields.Re upload file for new process' });
@@ -273,10 +273,10 @@ const handleCSVFiles = async (csvFiles: { entryName: string }[]) => {
     const questionsCsv = await handleQuestionCsv(validCSVData.questions, mediaEntries, processId);
     if (!questionsCsv?.result?.isValid) {
       logger.error(questionsCsv?.error?.errMsg);
-      await ContentStage.destroy({ where: { process_id: processId } });
       await destroyContent();
-      await QuestionStage.destroy({ where: { process_id: processId } });
+      await ContentStage.destroy({ where: { process_id: processId } });
       await destroyQuestion();
+      await QuestionStage.destroy({ where: { process_id: processId } });
       return questionsCsv;
     }
 
@@ -284,12 +284,12 @@ const handleCSVFiles = async (csvFiles: { entryName: string }[]) => {
     const questionSetsCsv = await handleQuestionSetCsv(validCSVData.questionSets, processId);
     if (!questionSetsCsv?.result?.isValid) {
       logger.error(questionSetsCsv?.error?.errMsg);
-      await ContentStage.destroy({ where: { process_id: processId } });
       await destroyContent();
-      await QuestionStage.destroy({ where: { process_id: processId } });
+      await ContentStage.destroy({ where: { process_id: processId } });
       await destroyQuestion();
-      await QuestionSetStage.destroy({ where: { process_id: processId } });
+      await QuestionStage.destroy({ where: { process_id: processId } });
       await destroyQuestionSet();
+      await QuestionSetStage.destroy({ where: { process_id: processId } });
       return questionSetsCsv;
     } else {
       await ContentStage.truncate({ restartIdentity: true });

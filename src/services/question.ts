@@ -23,7 +23,7 @@ export const deleteQuestions = async (whereClause: any): Promise<any> => {
   try {
     await Question.destroy({
       where: {
-        process_id: {
+        identifier: {
           [Op.in]: whereClause,
         },
       },

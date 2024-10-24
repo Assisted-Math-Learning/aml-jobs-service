@@ -1,7 +1,7 @@
 import logger from '../utils/logger';
 import { getAWSFolderData, uploadCsvFile } from '../services/awsService';
 import AdmZip from 'adm-zip';
-import _ from 'lodash';
+import _, { isEmpty, isNaN } from 'lodash';
 import { Parser } from '@json2csv/plainjs';
 import { getBoards, getClasses, getRepository, getSkills, getSubSkills, getTenants } from '../services/service';
 import { appConfiguration } from '../config';
@@ -85,7 +85,7 @@ export const getCSVTemplateHeader = async (entryName: string) => {
   };
 };
 
-const getCSVEntries = (csvFile: any) => {
+export const getCSVEntries = (csvFile: any) => {
   const filePath = path.join(appRootPath.path, 'tmp', `data.csv`);
   fs.writeFileSync(filePath, csvFile.getData());
   const localCSVFile = fs.readFileSync(filePath, 'utf-8');
@@ -94,13 +94,79 @@ const getCSVEntries = (csvFile: any) => {
   return csvRows as string[][];
 };
 
-export const getCSVHeaderAndRow = (csvFile: any) => {
+const processEachField = (value: any, header: any) => {
+  const headerName = header?.trim();
+
+  // Handle 'grid1_show_carry' and 'grid1_show_regroup' fields
+  if (headerName?.includes('grid1_show_carry') || headerName?.includes('grid1_show_regroup')) {
+    value = value === undefined || value.trim() === '' ? 'no' : value;
+  }
+
+  //handle to make array fo string of l2 ,l3 and sub skills
+  else if (headerName?.includes('l2_skill') || headerName?.includes('l3_skill')) {
+    value = typeof value === 'string' ? (isEmpty(value) ? [] : [value]) : value;
+  } else if (headerName === 'is_atomic') {
+    value = value ? value : false;
+  } else if (headerName.includes('sequence')) {
+    value = isEmpty(value) ? null : Number(value);
+  } else if (headerName.includes('benchmark_time')) {
+    value = isEmpty(value) ? null : Number(value);
+    if (isNaN(value)) {
+      value = null;
+    }
+  }
+
+  // Handle 'media' fields
+  else if (headerName === 'instruction_media') {
+    value = value ? value?.split('#') : [value];
+  } else if (headerName === 'media_file') {
+    value = value ? value?.split(',') : [];
+  }
+
+  // Handle sub skills.
+  else if (headerName?.includes('QID')) {
+    value = value?.trim();
+  } else if (
+    headerName?.includes('x_plus_x') ||
+    headerName?.includes('procedural') ||
+    headerName?.includes('carry') ||
+    headerName?.includes('x_plus_0') ||
+    headerName?.includes('0_plus_x') ||
+    headerName?.includes('procedure') ||
+    headerName?.includes('uneq_pvp')
+  ) {
+    value = isEmpty(value) ? [] : value.includes('#') ? value.split('#') : [String(value)];
+  } else if (headerName.includes('sub_skill')) {
+    value = isEmpty(value) ? [] : value.includes('#') ? value.split('#') : [String(value)];
+  }
+
+  return value;
+};
+
+export const getCSVHeaderAndRow = (csvEntries: any) => {
   try {
-    const csvEntries = getCSVEntries(csvFile);
-    const [header, ...rows] = csvEntries.filter((row: string[]) => row?.some((cell) => cell.trim() !== ''));
-    logger.info('Row/Header:: header and rows are extracted');
-    const cleanHeader = header.map((cell: string) => cell.replace(/\r/g, '').trim());
-    const cleanRows = rows.map((row: any) => row.map((cell: string) => cell.replace(/\r/g, '').trim()));
+    const csvData = csvEntries?.getData()?.toString('utf8');
+
+    // Use PapaParse to parse the CSV data
+    const parsedResult = papaparse?.parse(csvData, {
+      header: true,
+      skipEmptyLines: true,
+      transform: (value, header) => processEachField(value, header),
+    });
+
+    if (parsedResult.errors.length) {
+      return {
+        error: { errStatus: 'Unexpected error', errMsg: `Parsing errors: ${parsedResult.errors.map((err) => err.message).join(', ')}` },
+        result: {
+          isValid: false,
+          data: { header: '', rows: '' },
+        },
+      };
+    }
+
+    const cleanHeader = parsedResult?.meta?.fields;
+    const cleanRows = parsedResult?.data;
+
     return {
       error: { errStatus: null, errMsg: null },
       result: {
@@ -113,7 +179,7 @@ export const getCSVHeaderAndRow = (csvFile: any) => {
     return {
       error: { errStatus: 'Unexpected error', errMsg: errorMsg },
       result: {
-        isValid: true,
+        isValid: false,
         data: { header: '', rows: '' },
       },
     };
@@ -160,59 +226,35 @@ export const validateHeader = (entryName: string, header: any, templateHeader: a
   };
 };
 
-export const processRow = (rows: string[][], header: string[]) => {
-  return rows.map((row) =>
-    row.reduce(
-      (acc, cell, index) => {
-        const headerName = header[index]?.replace(/\r/g, '');
-        const cellValue = cell?.includes('#') ? cell.split('#').map((v: string) => v.trim()) : cell.replace(/\r/g, '');
-        if (headerName?.includes('grid1_show_carry')) {
-          acc[headerName] = cellValue === undefined ? 'no' : cellValue;
+export const processRow = (rows: any) => {
+  try {
+    const finalJsonForInsert = rows?.map((row: any) => {
+      row.body = {};
+
+      Object.keys(row).forEach((headerName: string) => {
+        const cellValue = row[headerName];
+
+        // Add fields matching the mcq, fib, grid, n1, n2 pattern to body
+        if (headerName.startsWith('mcq') || headerName.startsWith('fib') || headerName.startsWith('grid') || headerName.includes('n1') || headerName.includes('n2')) {
+          row.body[headerName] = cellValue ? String(cellValue) : '';
+        } else if (headerName?.includes('media_file')) {
+          row.media_files = row?.media_files || [];
+          if (cellValue) row?.media_files?.push(cellValue);
         }
-        if (headerName?.includes('grid1_show_regroup')) {
-          acc[headerName] = cellValue === undefined ? 'no' : cellValue;
-        }
-        if (headerName?.startsWith('mcq') || headerName?.startsWith('fib') || headerName?.startsWith('grid') || headerName?.includes('n1') || headerName?.includes('n2')) {
-          acc.body = acc.body || {};
-          acc.body[headerName] = cellValue;
-        } else if (headerName?.includes('l2_skill') || headerName?.includes('l3_skill') || headerName?.includes('sub_skill')) {
-          acc[headerName] = typeof cellValue === 'string' ? [cellValue] : cellValue;
-        } else if (headerName?.includes('instruction_media')) {
-          acc['instruction_media'] = typeof cellValue === 'string' ? [cellValue] : cellValue;
-        } else if (headerName?.includes('media')) {
-          acc.media_files = acc.media_files || [];
-          if (cellValue) acc.media_files.push(cellValue);
-        } else if (headerName?.includes('QSID')) {
-          acc['question_set_id'] = cellValue;
-        } else if (headerName?.includes('QID')) {
-          acc['question_id'] = cellValue;
-        } else if (headerName?.includes('sequence')) {
-          acc[headerName] = Number(cellValue);
-        } else if (headerName?.includes('benchmark_time')) {
-          acc[headerName] = cellValue && !Number.isNaN(Number(cellValue)) ? Number(cellValue) : 0;
-        } else if (headerName?.includes('x_plus_x')) {
-          acc['sub_skill_x_plus_x'] = cellValue;
-        } else if (headerName?.includes('x_plus_0')) {
-          acc['sub_skill_x_plus_0'] = cellValue;
-        } else if (headerName?.includes('procedural')) {
-          acc['sub_skill_procedural'] = cellValue;
-        } else if (headerName?.includes('carry')) {
-          acc['sub_skill_carry'] = cellValue;
-        } else if (headerName?.includes('is_atomic')) {
-          acc['is_atomic'] = cellValue.toLocaleString().toLowerCase() === 'true';
-        } else if (headerName?.includes('instruction_text')) {
-          acc['instruction_text'] = cellValue;
-        } else {
-          acc[headerName] = cellValue;
-        }
-        acc.identifier = uuid.v4();
-        acc.process_id = processId;
-        acc.created_by = 'system';
-        return acc;
-      },
-      {} as Record<string, any>,
-    ),
-  );
+      });
+
+      row['identifier'] = uuid.v4();
+      row['process_id'] = processId;
+      row['created_by'] = 'system';
+
+      return row;
+    });
+
+    return { data: finalJsonForInsert, errMsg: null };
+  } catch (error: any) {
+    logger.error(error.message);
+    return { data: [], errMsg: 'error in processing row ad json for inserting to staging' };
+  }
 };
 
 export const getUniqueValues = (data: any[]): UniqueValues => {

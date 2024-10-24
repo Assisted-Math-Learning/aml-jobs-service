@@ -39,4 +39,7 @@ export interface IConfiguration {
     bucketRegion: string;
     bucketOutput: string;
   };
+  questionBodyFields: string[];
+  mediaFields: string[];
+  requiredMetaFields: string[];
 }

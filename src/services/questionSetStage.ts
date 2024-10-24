@@ -9,13 +9,10 @@ export const createQuestionSetStage = async (insertData: Array<Record<string, an
     const [dataValues] = stagingData;
     await transact.commit();
     return { dataValues };
-  } catch (error) {
+  } catch (error: any) {
     await transact.rollback();
-    logger.error(error);
-    const err = error instanceof Error;
-    const errorMsg = err ? error.message || 'failed to create record' : '';
-    logger.error(errorMsg);
-    return { error: true, message: errorMsg };
+    logger.error(error?.message);
+    return { error: true, message: error?.message };
   }
 };
 

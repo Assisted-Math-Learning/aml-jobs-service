@@ -11,11 +11,11 @@ export const QuestionStage = AppDataSource.define(
     },
     process_id: {
       type: DataTypes.UUID,
-      allowNull: false,
+      allowNull: true,
     },
     identifier: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     question_text: {
       type: DataTypes.STRING,
@@ -23,7 +23,7 @@ export const QuestionStage = AppDataSource.define(
     },
     question_id: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     question_set_id: {
       type: DataTypes.STRING,
@@ -31,31 +31,31 @@ export const QuestionStage = AppDataSource.define(
     },
     sequence: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,
     },
     question_type: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     repository_name: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     board: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     class: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     l1_skill: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     l2_skill: {
       type: DataTypes.ARRAY(DataTypes.STRING),
-      allowNull: false,
+      allowNull: true,
     },
     l3_skill: {
       type: DataTypes.ARRAY(DataTypes.STRING),
@@ -75,11 +75,11 @@ export const QuestionStage = AppDataSource.define(
     },
     body: {
       type: DataTypes.JSONB,
-      allowNull: false,
+      allowNull: true,
     },
     benchmark_time: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,
     },
     sub_skill: {
       type: DataTypes.ARRAY(DataTypes.STRING),
@@ -103,7 +103,7 @@ export const QuestionStage = AppDataSource.define(
     },
     media_files: {
       type: DataTypes.JSONB,
-      allowNull: false,
+      allowNull: true,
     },
     status: {
       type: DataTypes.ENUM('progress', 'errored', 'success'),
@@ -115,7 +115,7 @@ export const QuestionStage = AppDataSource.define(
     },
     created_by: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     updated_by: {
       type: DataTypes.STRING,

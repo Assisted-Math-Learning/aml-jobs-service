@@ -37,7 +37,7 @@ export const deleteQuestionSets = async (whereClause: any): Promise<any> => {
   try {
     await QuestionSet.destroy({
       where: {
-        process_id: {
+        identifier: {
           [Op.in]: whereClause,
         },
       },

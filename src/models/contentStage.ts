@@ -11,19 +11,19 @@ export const ContentStage = AppDataSource.define(
     },
     identifier: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     process_id: {
       type: DataTypes.UUID,
-      allowNull: false,
+      allowNull: true,
     },
     content_id: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     title: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     description: {
       type: DataTypes.STRING,
@@ -31,23 +31,23 @@ export const ContentStage = AppDataSource.define(
     },
     repository_name: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     board: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     class: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     l1_skill: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     l2_skill: {
       type: DataTypes.ARRAY(DataTypes.STRING),
-      allowNull: false,
+      allowNull: true,
     },
     l3_skill: {
       type: DataTypes.ARRAY(DataTypes.STRING),
@@ -75,7 +75,7 @@ export const ContentStage = AppDataSource.define(
     },
     created_by: {
       type: DataTypes.STRING,
-      allowNull: false,
+      allowNull: true,
     },
     updated_by: {
       type: DataTypes.STRING,

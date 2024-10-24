@@ -6,6 +6,9 @@ import { contentStageMetaData, createContentStage, getAllStageContent, updateCon
 import { createContent, deleteContents } from '../services/content';
 import { getCSVTemplateHeader, getCSVHeaderAndRow, validateHeader, processRow, convertToCSV, preloadData, checkValidity } from '../services/util';
 import { Status } from '../enums/status';
+import { appConfiguration } from '../config';
+
+const { requiredMetaFields } = appConfiguration;
 
 let mediaFileEntries: any[];
 let processId: string;
@@ -32,7 +35,7 @@ export const handleContentCsv = async (contentsCsv: object[], media: any, proces
       result: { data },
     } = validatedContentHeader;
 
-    const validatedContentRows = processContentRows(data?.rows, data?.header);
+    const validatedContentRows = processContentRows(data?.rows);
     if (!validatedContentRows?.result?.isValid) return validatedContentRows;
     const { result } = validatedContentRows;
 
@@ -62,6 +65,7 @@ export const handleContentCsv = async (contentsCsv: object[], media: any, proces
 
   await updateProcess(processId, { status: Status.VALIDATED });
 
+  logger.info(`Content Media upload:: ${processId} content Stage data is ready for upload media to cloud`);
   const contentsMedia = await processContentMediaFiles();
   if (!contentsMedia?.result?.isValid) return contentsMedia;
 
@@ -109,15 +113,15 @@ const validateCSVContentHeaderRow = async (contentEntry: any) => {
   };
 };
 
-const processContentRows = (rows: any, header: any) => {
-  const processData = processRow(rows, header);
-  if (!processData || processData?.length === 0) {
-    logger.error('Content Row/Header:: Row processing failed or returned empty data');
+const processContentRows = (rows: any) => {
+  const processData = processRow(rows);
+  if (!processData || processData?.data?.length === 0) {
+    logger.error(`Content Row/header:: ${processData.errMsg}`);
     return {
-      error: { errStatus: 'process_error', errMsg: 'Row processing failed or returned empty data' },
+      error: { errStatus: 'process_error', errMsg: `content:: ${processData.errMsg}` },
       result: {
         isValid: false,
-        data: processData,
+        data: processData.data,
       },
     };
   }
@@ -126,7 +130,7 @@ const processContentRows = (rows: any, header: any) => {
     error: { errStatus: null, errMsg: null },
     result: {
       isValid: true,
-      data: processData,
+      data: processData.data,
     },
   };
 };
@@ -136,7 +140,7 @@ const bulkInsertContentStage = async (insertData: object[]) => {
   if (contentStage?.error) {
     logger.error(`Insert Content Staging:: ${processId} content bulk data error in inserting`);
     return {
-      error: { errStatus: 'errored', errMsg: 'content bulk data error in inserting' },
+      error: { errStatus: 'errored', errMsg: `content bulk data error in inserting ${contentStage.message}` },
       result: {
         isValid: false,
         data: null,
@@ -176,6 +180,10 @@ const validateStagedContentData = async () => {
       },
     };
   }
+
+  // Check if any row has invalid fields and collect invalid field names
+  const requiredMetaFieldsCheck = await checkRequiredMetaFields(getAllContentStage);
+  if (!requiredMetaFieldsCheck?.result?.isValid) return requiredMetaFieldsCheck;
 
   const validateMetadata = await checkValidity(getAllContentStage);
   if (!validateMetadata?.result?.isValid) return validateMetadata;
@@ -231,7 +239,6 @@ const uploadErroredContentsToCloud = async () => {
     };
   }
   logger.info('Content csv upload:: all the data are validated successfully and uploaded to cloud for reference');
-  logger.info(`Content Media upload:: ${processId} content Stage data is ready for upload media to cloud`);
   return {
     error: { errStatus: 'validation_errored', errMsg: 'content file validation errored' },
     result: {
@@ -404,7 +411,51 @@ const formatStagedContentData = async (stageData: any[]) => {
 
 export const destroyContent = async () => {
   const contents = await contentStageMetaData({ process_id: processId });
-  const contentId = contents.map((obj: any) => obj.identifier);
+  const contentId = contents?.map((obj: any) => obj.identifier);
   const deletedContent = await deleteContents(contentId);
   return deletedContent;
+};
+
+const checkRequiredMetaFields = async (stageData: any) => {
+  const allInvalidFields: string[] = [];
+
+  for (const row of stageData) {
+    const invalidFieldsInRow: string[] = [];
+
+    _.forEach(requiredMetaFields, (field) => {
+      const value = row[field];
+      if (_.isNull(value)) {
+        invalidFieldsInRow.push(field);
+      }
+    });
+
+    if (!_.isEmpty(invalidFieldsInRow)) {
+      allInvalidFields.push(...invalidFieldsInRow);
+
+      await updateContentStage(
+        { id: row.id },
+        {
+          status: 'errored',
+          error_info: `Empty field identified ${invalidFieldsInRow.join(',')}`,
+        },
+      );
+    }
+  }
+
+  const uniqueInvalidFields = _.uniq(allInvalidFields);
+  if (uniqueInvalidFields.length > 0) {
+    return {
+      error: { errStatus: 'error', errMsg: `Skipping the process due to invalid field(s): ${uniqueInvalidFields.join(',')}` },
+      result: {
+        isValid: false,
+      },
+    };
+  }
+
+  return {
+    error: { errStatus: null, errMsg: null },
+    result: {
+      isValid: true,
+    },
+  };
 };

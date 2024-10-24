@@ -23,7 +23,11 @@ const appConfiguration: IConfiguration = {
     user: get(envVars, 'AML_SERVICE_DB_USER', 'postgres'),
   },
   bucketName: get(envVars, 'BUCKET_NAME', ''),
-  csvFileName: get(envVars, 'CSV_FILE_NAME', 'division-question.csv,multiply-question.csv,addition-question.csv,subtraction-question.csv,media,division-questionSet.csv,multiply-questionSet.csv,addition-questionSet.csv,subtraction-questionSet.csv,division-content.csv,multiply-content.csv,addition-content.csv,subtraction-content.csv').split(','),
+  csvFileName: get(
+    envVars,
+    'CSV_FILE_NAME',
+    'division-question.csv,multiply-question.csv,addition-question.csv,subtraction-question.csv,media,division-questionSet.csv,multiply-questionSet.csv,addition-questionSet.csv,subtraction-questionSet.csv,division-content.csv,multiply-content.csv,addition-content.csv,subtraction-content.csv',
+  ).split(','),
   presignedUrlExpiry: get(envVars, 'PRESIGNED_URL_EXPIRY_TIME', 600) as number,
   processInterval: get(envVars, 'PROCESS_INTERVAL', 300000) as number,
   reCheckProcessInterval: get(envVars, 'RE_CHECK_PROCESS_INTERVAL', 4) as number, //hours
@@ -44,6 +48,17 @@ const appConfiguration: IConfiguration = {
     bucketRegion: get(envVars, 'AML_AWS_BUCKET_REGION', 'us-east-1'),
     bucketOutput: get(envVars, 'AML_AWS_BUCKET_OUTPUT', 'table'),
   },
+  questionBodyFields: get(
+    envVars,
+    'QUESTION_BODY_FIELDS',
+    'mcq_question_image,grid1_show_carry,grid_fib_n1,grid_fib_n2,mcq_option_1,mcq_option_2,mcq_option_3,mcq_option_4,mcq_option_5,mcq_option_6,mcq_correct_options,grid2_pre_fills_n1,grid2_pre_fills_n2,grid1_pre_fills_top,grid1_pre_fills_result,grid1_pre_fills_remainder,grid1_pre_fills_quotient,grid1_multiply_intermediate_steps_prefills,grid1_pre_fills_result',
+  ).split(','),
+  mediaFields: get(envVars, 'MEDIA_FIELDS', 'media_file_1,media_file_2,media_file_3,media_file_4,media_file_5').split(','),
+  requiredMetaFields: get(
+    envVars,
+    'REQUIRED_META_FIELDS',
+    'l1_skill,l2_skill,class,board,sequence,question_type,repository_name,benchmark_time,identifier,process_id,content_id,QID,question_set_id',
+  ).split(','),
 };
 
 export default appConfiguration;

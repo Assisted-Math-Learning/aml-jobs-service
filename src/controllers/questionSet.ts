@@ -7,8 +7,10 @@ import { getCSVTemplateHeader, getCSVHeaderAndRow, validateHeader, processRow, c
 import { Status } from '../enums/status';
 import { questionStageMetaData } from '../services/questionStage';
 import { contentStageMetaData } from '../services/contentStage';
+import { appConfiguration } from '../config';
 
 let processId: string;
+const { requiredMetaFields } = appConfiguration;
 
 export const handleQuestionSetCsv = async (questionSetsCsv: object[], process_id: string) => {
   processId = process_id;
@@ -32,7 +34,7 @@ export const handleQuestionSetCsv = async (questionSetsCsv: object[], process_id
       result: { data },
     } = validatedQuestionSetHeader;
 
-    const validatedRowData = processQuestionSetRows(data?.rows, data?.header);
+    const validatedRowData = processQuestionSetRows(data?.rows);
     if (!validatedRowData?.result?.isValid) return validatedRowData;
     const { result } = validatedRowData;
 
@@ -105,15 +107,15 @@ const validateCSVQuestionSetHeaderRow = async (questionSetEntry: any) => {
   };
 };
 
-const processQuestionSetRows = (rows: any, header: any) => {
-  const processedRowData = processRow(rows, header);
-  if (!processedRowData || processedRowData?.length === 0) {
-    logger.error('Question Set Row/header:: Row processing failed or returned empty data');
+const processQuestionSetRows = (rows: any) => {
+  const processData = processRow(rows);
+  if (!processData || processData?.data?.length === 0) {
+    logger.error(`Question set Row/header:: ${processData.errMsg}`);
     return {
-      error: { errStatus: 'process_error', errMsg: 'Row processing failed or returned empty data' },
+      error: { errStatus: 'process_error', errMsg: `question set:: ${processData.errMsg}` },
       result: {
         isValid: false,
-        data: processedRowData,
+        data: processData.data,
       },
     };
   }
@@ -122,7 +124,7 @@ const processQuestionSetRows = (rows: any, header: any) => {
     error: { errStatus: null, errMsg: null },
     result: {
       isValid: true,
-      data: processedRowData,
+      data: processData.data,
     },
   };
 };
@@ -130,9 +132,9 @@ const processQuestionSetRows = (rows: any, header: any) => {
 const bulkInsertQuestionSetStage = async (insertData: object[]) => {
   const questionSetStage = await createQuestionSetStage(insertData);
   if (questionSetStage?.error) {
-    logger.error(`Insert Question SetStaging:: ${processId} question set  bulk data error in inserting ,${questionSetStage.message}`);
+    logger.error(`Insert Question SetStaging:: ${processId} question set  bulk data error in inserting .`);
     return {
-      error: { errStatus: 'errored', errMsg: `question set bulk data error in inserting,${questionSetStage.message}` },
+      error: { errStatus: 'errored', errMsg: `question set bulk data error in inserting.${questionSetStage.message}` },
       result: {
         isValid: false,
         data: null,
@@ -171,6 +173,10 @@ const validateQuestionSetsStage = async () => {
       },
     };
   }
+
+  // Check if any row has invalid fields and collect invalid field names
+  const requiredMetaFieldsCheck = await checkRequiredMetaFields(getAllQuestionSetStage);
+  if (!requiredMetaFieldsCheck?.result?.isValid) return requiredMetaFieldsCheck;
 
   const validateMetadata = await checkValidity(getAllQuestionSetStage);
   if (!validateMetadata?.result?.isValid) return validateMetadata;
@@ -384,4 +390,48 @@ export const destroyQuestionSet = async () => {
   const questionSetId = questionSets.map((obj: any) => obj.identifier);
   const deletedQuestionSet = await deleteQuestionSets(questionSetId);
   return deletedQuestionSet;
+};
+
+const checkRequiredMetaFields = async (stageData: any) => {
+  const allInvalidFields: string[] = [];
+
+  for (const row of stageData) {
+    const invalidFieldsInRow: string[] = [];
+
+    _.forEach(requiredMetaFields, (field) => {
+      const value = row[field];
+      if (_.isNull(value)) {
+        invalidFieldsInRow.push(field);
+      }
+    });
+
+    if (!_.isEmpty(invalidFieldsInRow)) {
+      allInvalidFields.push(...invalidFieldsInRow);
+
+      await updateQuestionStageSet(
+        { id: row.id },
+        {
+          status: 'errored',
+          error_info: `Empty field identified ${invalidFieldsInRow.join(',')}`,
+        },
+      );
+    }
+  }
+
+  const uniqueInvalidFields = _.uniq(allInvalidFields);
+  if (uniqueInvalidFields.length > 0) {
+    return {
+      error: { errStatus: 'error', errMsg: `Skipping the process due to invalid field(s): ${uniqueInvalidFields.join(',')}` },
+      result: {
+        isValid: false,
+      },
+    };
+  }
+
+  return {
+    error: { errStatus: null, errMsg: null },
+    result: {
+      isValid: true,
+    },
+  };
 };

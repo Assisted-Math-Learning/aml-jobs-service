@@ -37,7 +37,7 @@ export const deleteContents = async (whereClause: any): Promise<any> => {
   try {
     await Content.destroy({
       where: {
-        process_id: {
+        identifier: {
           [Op.in]: whereClause,
         },
       },
