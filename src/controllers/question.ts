@@ -601,7 +601,8 @@ const getAnswer = (skill: string, num1: string, num2: string, type: string, body
 };
 
 const addSubAnswer = (input: any, l1_skill: string) => {
-  const { grid_fib_n1, grid_fib_n2, grid1_pre_fills_top, grid1_pre_fills_result, grid1_show_carry, grid1_show_regroup } = input;
+  const { grid_fib_n1, grid_fib_n2, grid1_pre_fills_top, grid1_pre_fills_result, grid1_show_carry, grid1_show_regroup, QID } = input;
+  logger.info('[addSubAnswer] QID', QID);
 
   const maxLength = Math.max(grid_fib_n1.length, grid_fib_n2.length);
   const n1Str = grid_fib_n1.padStart(maxLength, '0');
@@ -612,12 +613,17 @@ const addSubAnswer = (input: any, l1_skill: string) => {
   let answerResult = '';
   let isPrefil = false;
 
+  logger.info('[addSubAnswer] l1_skill', l1_skill);
   if (l1_skill === 'Addition') {
+    logger.info('[addSubAnswer] l1_skill is Addition');
     result = parseInt(n1Str) + parseInt(n2Str);
     isPrefil = grid1_show_carry === 'yes';
+    logger.info(`[addSubAnswer] grid1_show_carry = ${grid1_show_carry} and typeof grid1_show_carry = ${typeof grid1_show_carry} and isPrefil = ${isPrefil}`);
   } else if (l1_skill === 'Subtraction') {
+    logger.info('[addSubAnswer] l1_skill is Subtraction');
     result = parseInt(n1Str) - parseInt(n2Str);
     isPrefil = grid1_show_regroup === 'yes';
+    logger.info(`[addSubAnswer] grid1_show_regroup = ${grid1_show_regroup} and typeof grid1_show_regroup = ${typeof grid1_show_regroup} and isPrefil = ${isPrefil}`);
   }
 
   const resultStr = result.toString();
@@ -685,6 +691,7 @@ const addSubAnswer = (input: any, l1_skill: string) => {
   } else {
     answerTop = 'B'.repeat(n1Str.length);
   }
+  logger.info(`[addSubAnswer] final isPrefil = ${isPrefil} and typeof isPrefil = ${typeof isPrefil}`);
   return {
     result: parseInt(resultStr),
     isPrefil,
