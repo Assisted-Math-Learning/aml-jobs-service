@@ -14,6 +14,7 @@ const AppDataSource = new Sequelize({
   password: password,
   database: name,
   models: [__dirname + '/models/*.ts'],
+  logging: false,
 });
 
 export const query = async (query: string) => {
