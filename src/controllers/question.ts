@@ -601,8 +601,8 @@ const getAnswer = (skill: string, num1: string, num2: string, type: string, body
 };
 
 const addSubAnswer = (input: any, l1_skill: string) => {
-  const { grid_fib_n1, grid_fib_n2, grid1_pre_fills_top, grid1_pre_fills_result, grid1_show_carry, grid1_show_regroup, QID } = input;
-  logger.info(`[addSubAnswer] QID = ${QID}`);
+  const { grid_fib_n1, grid_fib_n2, grid1_pre_fills_top, grid1_pre_fills_result, grid1_show_carry, grid1_show_regroup } = input;
+  logger.info(`[addSubAnswer] input = ${JSON.stringify(input)}`);
 
   const maxLength = Math.max(grid_fib_n1.length, grid_fib_n2.length);
   const n1Str = grid_fib_n1.padStart(maxLength, '0');
