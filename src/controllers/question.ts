@@ -489,8 +489,8 @@ const processQuestionStage = (questionsData: any) => {
     Mcq: mcqFields,
     Fib: fibFields,
   };
-  logger.info('[processQuestionStage] fieldMapping', fieldMapping);
-  logger.info('[processQuestionStage] questionBodyFields', questionBodyFields);
+  logger.info(`[processQuestionStage] fieldMapping = ${JSON.stringify(fieldMapping)}`);
+  logger.info(`[processQuestionStage] questionBodyFields = ${JSON.stringify(questionBodyFields)}`);
   questionsData.forEach((question: any) => {
     const questionType = question?.question_type === 'Grid-1' ? `${question?.question_type}_${question?.l1_skill}` : question?.question_type;
     const relevantFields = fieldMapping[questionType];
