@@ -4,7 +4,7 @@ import { uploadMediaFile } from '../services/awsService';
 import { updateProcess } from '../services/process';
 import { contentStageMetaData, createContentStage, getAllStageContent, updateContentStage } from '../services/contentStage';
 import { createContent, deleteContents } from '../services/content';
-import { getCSVTemplateHeader, getCSVHeaderAndRow, validateHeader, processRow, convertToCSV, preloadData, checkValidity } from '../services/util';
+import { checkValidity, convertToCSV, getCSVHeaderAndRow, getCSVTemplateHeader, preloadData, processRow, validateHeader } from '../services/util';
 import { Status } from '../enums/status';
 import { appConfiguration } from '../config';
 
@@ -39,7 +39,7 @@ export const handleContentCsv = async (contentsCsv: object[], media: any, proces
     if (!validatedContentRows?.result?.isValid) return validatedContentRows;
     const { result } = validatedContentRows;
 
-    contentsData = contentsData.concat(result.data);
+    contentsData = contentsData.concat(result.data).map((datum: any) => ({ ...datum, x_id: datum.content_id }));
     if (contentsData?.length === 0) {
       logger.error('Error while processing the content csv data');
       return {
@@ -379,9 +379,9 @@ const formatStagedContentData = async (stageData: any[]) => {
   const { boards, classes, skills, subSkills, repositories } = await preloadData();
 
   const transformedData = stageData.map((obj) => {
-    const transferData = {
+    return {
       identifier: obj.identifier,
-      content_id: obj?.content_id,
+      x_id: obj?.x_id,
       name: { en: obj?.title || obj?.question_text },
       description: { en: obj?.description },
       tenant: '',
@@ -400,7 +400,6 @@ const formatStagedContentData = async (stageData: any[]) => {
       created_by: 'system',
       is_active: true,
     };
-    return transferData;
   });
   logger.info('Data transfer:: staging Data transferred as per original format');
   return transformedData;

@@ -4,8 +4,8 @@ import { uploadMediaFile } from '../services/awsService';
 import { updateProcess } from '../services/process';
 import { createQuestionStage, getAllStageQuestion, questionStageMetaData, updateQuestionStage } from '../services/questionStage';
 import { appConfiguration } from '../config';
-import { createQuestion, deleteQuestions } from '../services/question';
-import { getCSVTemplateHeader, getCSVHeaderAndRow, validateHeader, processRow, convertToCSV, preloadData, checkValidity } from '../services/util';
+import { createQuestion, deleteQuestions, findExistingQuestionXIDs } from '../services/question';
+import { checkValidity, convertToCSV, getCSVHeaderAndRow, getCSVTemplateHeader, preloadData, processRow, validateHeader } from '../services/util';
 import { Status } from '../enums/status';
 
 let mediaFileEntries: any[];
@@ -39,7 +39,7 @@ export const handleQuestionCsv = async (questionsCsv: object[], media: any, proc
     if (!validQuestionRows?.result?.isValid) return validQuestionRows;
     const { result } = validQuestionRows;
 
-    questionsData = questionsData.concat(result.data);
+    questionsData = questionsData.concat(result.data).map((datum: any) => ({ ...datum, x_id: datum.QID }));
     if (questionsData?.length === 0) {
       logger.error('Error while processing the question csv data');
       return {
@@ -453,7 +453,10 @@ export const migrateToMainQuestion = async () => {
       },
     };
   }
-  const questionInsert = await createQuestion(insertData);
+  const stageQuestionsXIDs: string[] = insertData.map((datum) => datum.x_id);
+  const existingXIDs = (await findExistingQuestionXIDs(stageQuestionsXIDs)).map((datum: any) => datum.x_id);
+  const finalInsertData = insertData.filter((datum) => !existingXIDs.includes(datum.x_id));
+  const questionInsert = await createQuestion(finalInsertData);
   if (questionInsert?.error) {
     logger.error(`Insert Question main:: ${processId} question bulk data error in inserting to main table.`);
     return {
@@ -504,7 +507,7 @@ const formatQuestionStageData = async (stageData: any[]) => {
   try {
     const { boards, classes, skills, subSkills, repositories } = await preloadData();
 
-    const transformedData = stageData.map((obj) => {
+    let transformedData = stageData.map((obj) => {
       const {
         grid_fib_n1 = null,
         grid_fib_n2 = null,
@@ -517,8 +520,9 @@ const formatQuestionStageData = async (stageData: any[]) => {
         mcq_question_image = null,
         mcq_correct_options = null,
       } = obj?.body || {};
-      const transferData = {
+      return {
         identifier: obj.identifier,
+        x_id: obj?.x_id,
         question_type: obj?.question_type,
         operation: obj?.l1_skill,
         hints: obj?.hint,
@@ -541,7 +545,12 @@ const formatQuestionStageData = async (stageData: any[]) => {
             obj?.question_type?.toLowerCase() === 'mcq' ? [mcq_option_1, mcq_option_2, mcq_option_3, mcq_option_4, mcq_option_5, mcq_option_6].filter((option) => !_.isEmpty(option)) : undefined,
           correct_option: obj?.question_type?.toLowerCase() === 'mcq' ? mcq_correct_options : undefined,
           answers: getAnswer(obj?.l1_skill, grid_fib_n1, grid_fib_n2, obj?.question_type, obj?.body, obj?.question_type),
-          wrong_answer: convertWrongAnswerSubSkills({ carry: obj?.sub_skill_carry, procedural: obj?.sub_skill_procedural, x_plus_x: obj?.sub_skill_x_plus_0, x_plus_0: obj?.sub_skill_x_plus_x }),
+          wrong_answer: convertWrongAnswerSubSkills({
+            carry: obj?.sub_skill_carry,
+            procedural: obj?.sub_skill_procedural,
+            x_plus_x: obj?.sub_skill_x_plus_0,
+            x_plus_0: obj?.sub_skill_x_plus_x,
+          }),
         },
         benchmark_time: obj?.benchmark_time,
         status: 'live',
@@ -549,8 +558,9 @@ const formatQuestionStageData = async (stageData: any[]) => {
         created_by: 'system',
         is_active: true,
       };
-      return transferData;
     });
+
+    transformedData = _.uniqBy(transformedData, 'x_id');
 
     logger.info('Data transfer:: staging Data transferred as per original format');
     return transformedData;

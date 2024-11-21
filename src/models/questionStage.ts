@@ -13,9 +13,15 @@ export const QuestionStage = AppDataSource.define(
       type: DataTypes.UUID,
       allowNull: true,
     },
+    x_id: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
+    },
     identifier: {
       type: DataTypes.STRING,
       allowNull: true,
+      unique: true,
     },
     question_text: {
       type: DataTypes.STRING,

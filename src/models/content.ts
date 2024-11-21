@@ -9,9 +9,15 @@ export const Content = AppDataSource.define(
       primaryKey: true,
       autoIncrement: true,
     },
+    x_id: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
+    },
     identifier: {
       type: DataTypes.STRING,
       allowNull: false,
+      unique: true,
     },
     name: {
       type: DataTypes.JSONB,
