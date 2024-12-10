@@ -5,13 +5,13 @@ import { updateProcess } from '../services/process';
 import { createQuestionStage, getAllStageQuestion, questionStageMetaData, updateQuestionStage } from '../services/questionStage';
 import { appConfiguration } from '../config';
 import { createQuestion, deleteQuestions } from '../services/question';
-import { getCSVTemplateHeader, getCSVHeaderAndRow, validateHeader, processRow, convertToCSV, preloadData, checkValidity } from '../services/util';
+import { checkValidity, convertToCSV, getCSVHeaderAndRow, getCSVTemplateHeader, preloadData, processRow, validateHeader } from '../services/util';
 import { Status } from '../enums/status';
 
 let mediaFileEntries: any[];
 let processId: string;
 
-const { grid1AddFields, grid1DivFields, grid1MultipleFields, grid1SubFields, grid2Fields, mcqFields, fibFields, questionBodyFields, mediaFields, requiredMetaFields } = appConfiguration;
+const { grid1AddFields, grid1DivFields, grid1MultipleFields, grid1SubFields, grid2Fields, fibDivFields, mcqFields, fibFields, questionBodyFields, mediaFields, requiredMetaFields } = appConfiguration;
 
 export const handleQuestionCsv = async (questionsCsv: object[], media: any, process_id: string) => {
   processId = process_id;
@@ -236,16 +236,16 @@ const validateStagedQuestionData = async () => {
     let requiredData;
     const caseKey = question_type === 'Grid-1' ? `${question_type}_${l1_skill}` : question_type;
     switch (caseKey) {
-      case `Grid-1_add`:
+      case `Grid-1_Addition`:
         requiredFields = grid1AddFields;
         break;
-      case `Grid-1_sub`:
+      case `Grid-1_Subtraction`:
         requiredFields = grid1SubFields;
         break;
-      case `Grid-1_multiple`:
+      case `Grid-1_Multiplication`:
         requiredFields = grid1MultipleFields;
         break;
-      case `Grid-1_division`:
+      case `Grid-1_Division`:
         requiredFields = grid1DivFields;
         break;
       case `Grid-2`:
@@ -256,7 +256,7 @@ const validateStagedQuestionData = async () => {
         requiredData = 'question_text,mcq_question_image,mcq_option_1,mcq_option_2,mcq_option_3,mcq_option_4,mcq_option_5,mcq_option_6,mcq_correct_options';
         break;
       case `Fib`:
-        requiredFields = fibFields;
+        requiredFields = l1_skill === 'Division' ? fibDivFields : fibFields;
         break;
       default:
         requiredFields = [];
@@ -489,9 +489,11 @@ const processQuestionStage = (questionsData: any) => {
     'Grid-2': [...grid2Fields, 'grid2_pre_fills_n1', 'grid2_pre_fills_n2'],
     Mcq: mcqFields,
     Fib: fibFields,
+    Fib_Division: fibDivFields,
   };
   questionsData.forEach((question: any) => {
-    const questionType = question?.question_type === 'Grid-1' ? `${question?.question_type}_${question?.l1_skill}` : question?.question_type;
+    const questionType =
+      question?.question_type === 'Grid-1' || (question?.l1_skill === 'Division' && question?.question_type === 'Fib') ? `${question?.question_type}_${question?.l1_skill}` : question?.question_type;
     const relevantFields = fieldMapping[questionType];
     const filteredBody: any = {};
     relevantFields.forEach((field: any) => {
@@ -603,7 +605,9 @@ const getAnswer = (skill: string, num1: string, num2: string, type: string, body
       return multiplicationFIBAnswer(bodyObject);
 
     case 'Division_Grid-1':
-      return divideWithSteps(Number(num1), Number(num2), type, bodyObject);
+      return divisionGrid1Answer(bodyObject);
+    case 'Division_Fib':
+      return divisionFIBAnswer(bodyObject);
 
     default:
       return undefined;
@@ -674,6 +678,17 @@ const addGrid1Answer = (input: any) => {
   };
 };
 
+const addFIBAnswer = (input: any) => {
+  const { grid_fib_n1, grid_fib_n2 } = input;
+  return {
+    result: parseInt(grid_fib_n1) + parseInt(grid_fib_n2),
+  };
+};
+
+const addPaddingToDifference = (n1: number, n2: number) => {
+  return !(n1.toString().length === 2 && n2.toString().length === 1 && (n1 - n2).toString().length === 1);
+};
+
 const borrowAndReturnNewNumber = (num: string, currentIndex: number) => {
   let numStr = num;
   const numOnLeft = +numStr[currentIndex - 1];
@@ -719,7 +734,7 @@ const subGrid1Answer = (input: any) => {
   let result = 0;
   let answerResult = '';
   let isPrefil = grid1_show_regroup === 'yes';
-  let addPaddingToResult = true;
+  const addPaddingToResult = addPaddingToDifference(grid_fib_n1, grid_fib_n2);
   let errorMsg = '';
 
   logger.info('[addSubAnswer] l1_skill is Subtraction');
@@ -752,12 +767,6 @@ const subGrid1Answer = (input: any) => {
 
   let resultStr = result.toString();
 
-  if (grid_fib_n1.length === 2 && grid_fib_n2.length === 1) {
-    addPaddingToResult = resultStr.length !== 1;
-  } else {
-    addPaddingToResult = true;
-  }
-
   resultStr = addPaddingToResult ? resultStr.padStart(n1Str.length, '0') : resultStr;
 
   if (resultStr.length !== grid1_pre_fills_result.length) {
@@ -782,13 +791,6 @@ const subGrid1Answer = (input: any) => {
     isPrefil,
     answerTop: answerTop.join('|'),
     answerResult: answerResult.split('').reverse().join(''),
-  };
-};
-
-const addFIBAnswer = (input: any) => {
-  const { grid_fib_n1, grid_fib_n2 } = input;
-  return {
-    result: parseInt(grid_fib_n1) + parseInt(grid_fib_n2),
   };
 };
 
@@ -873,65 +875,173 @@ const multiplicationFIBAnswer = (input: any) => {
   };
 };
 
-const divideWithSteps = (dividend: number, divisor: number, type: string, prefillPattern: any) => {
-  const strDividend = dividend.toString();
-  let quotient = '';
-  let remainder = 0;
-  let intermediateSteps = '';
-  let prefilledQuotient;
-  let prefilledRemainder;
-
-  if (type === 'Grid-1') {
-    const { grid1_pre_fills_quotient, grid1_pre_fills_remainder, grid1_div_intermediate_steps_prefills } = prefillPattern;
-
-    if (divisor === 0) {
-      throw new Error('Division by zero is not allowed.');
+const getDivGrid1IntermediateStepsQuotientAndRemainder = (n1: number, n2: number) => {
+  const n1Str = n1.toString();
+  const answers: string[] = [];
+  const answersWithPadding: string[] = [];
+  let currentNumber = 0;
+  let k = 0;
+  let lastDifferenceValue = '';
+  let lastSubN1 = 0;
+  let lastSubN2 = 0;
+  for (let i = 0; i < n1Str.length && k < n1Str.length; i++) {
+    if (lastDifferenceValue !== '' && +lastDifferenceValue === 0 && +n1Str[k] < n2) {
+      answers.push(lastDifferenceValue + n1Str[k]);
+      answersWithPadding.push(answers[answers.length - 1].toString().padStart(k + 1, '#'));
+      answers.push('0');
+      answersWithPadding.push(answers[answers.length - 1].toString().padStart(k + 1, '#'));
+      lastSubN1 = Number(lastDifferenceValue + n1Str[k]);
+      lastSubN2 = 0;
+      lastDifferenceValue = n1Str[k];
+      currentNumber = +lastDifferenceValue;
+      k++;
+      continue;
     }
-
-    for (let i = 0; i < strDividend.length; i++) {
-      const currentDigit = +strDividend[i];
-      const currentNumber = remainder * 10 + currentDigit;
-      const currentQuotient = Math.floor(currentNumber / divisor);
-      remainder = currentNumber % divisor;
-      quotient += currentQuotient;
-      intermediateSteps += currentNumber;
+    let skipSlice = false;
+    if (lastDifferenceValue !== '' && +lastDifferenceValue === 0) {
+      skipSlice = true;
     }
-    quotient = quotient.replace(/^0+/, '') || '0';
-    if (grid1_pre_fills_quotient || grid1_pre_fills_remainder || grid1_div_intermediate_steps_prefills) {
-      if (grid1_pre_fills_quotient.includes('F')) {
-        prefilledQuotient = applyPrefillPattern(quotient.toString(), grid1_pre_fills_quotient);
-        quotient = prefilledQuotient;
+    if (i === 0) {
+      while (currentNumber < n2 && k < n1Str.length) {
+        currentNumber = currentNumber * 10 + +n1Str[k++];
       }
-      if (grid1_pre_fills_remainder.includes('F')) {
-        prefilledRemainder = applyPrefillPattern(remainder.toString(), grid1_pre_fills_remainder);
-        remainder = parseInt(prefilledRemainder);
+    } else if (k < n1Str.length) {
+      if (currentNumber < n2) {
+        currentNumber = currentNumber * 10 + +n1Str[k];
       }
-      if (grid1_div_intermediate_steps_prefills.includes('F')) {
-        intermediateSteps = applyPrefillPattern(intermediateSteps, grid1_div_intermediate_steps_prefills);
+      if (currentNumber < n2) {
+        answers.push(lastDifferenceValue + n1Str[k]);
+        answersWithPadding.push(answers[answers.length - 1].toString().padStart(k + 1, '#'));
+        answers.push('0');
+        answersWithPadding.push(answers[answers.length - 1].toString().padStart(k + 1, '#'));
+        lastSubN1 = Number(lastDifferenceValue + n1Str[k]);
+        lastSubN2 = 0;
+        lastDifferenceValue = Number(lastDifferenceValue + n1Str[k]).toString();
+        currentNumber = +lastDifferenceValue;
+        k++;
+        continue;
+      } else {
+        k++;
       }
     }
-
-    return {
-      quotient: quotient,
-      remainder: remainder,
-      intermediateSteps: intermediateSteps,
-    };
+    if (i > 0) {
+      const finalCurrentNumber = lastDifferenceValue + currentNumber.toString().slice(skipSlice ? 0 : Number(lastDifferenceValue).toString().length);
+      answers.push(finalCurrentNumber);
+      answersWithPadding.push(answers[answers.length - 1].toString().padStart(k, '#'));
+    }
+    const closestMultiple = Math.floor(currentNumber / n2) * n2;
+    answers.push(closestMultiple.toString());
+    answersWithPadding.push(answers[answers.length - 1].toString().padStart(k, '#'));
+    const difference = (currentNumber - closestMultiple).toString();
+    lastDifferenceValue = addPaddingToDifference(currentNumber, closestMultiple) ? difference.padStart(currentNumber.toString().length, '0') : difference;
+    lastSubN1 = currentNumber;
+    lastSubN2 = closestMultiple;
+    currentNumber = +difference;
   }
+
+  const remainder = (lastSubN1 - lastSubN2).toString();
+
+  return {
+    intermediateSteps: answers,
+    intermediateStepsWithPadding: answersWithPadding,
+    quotient: Math.floor(n1 / n2).toString(),
+    remainder: addPaddingToDifference(lastSubN1, lastSubN2) ? remainder.padStart(lastSubN1.toString().length, '0') : remainder,
+  };
 };
 
-const applyPrefillPattern = (numStr: string, pattern: string) => {
-  let result = '';
-  const patternLength = pattern.length;
+const getPaddedInterMediateStepsPattern = (intermediateSteps: string[], intermediateStepsWithPadding: string[]) => {
+  const finalAns: string[] = [];
 
-  for (let i = numStr.length - 1; i >= 0; i--) {
-    if (i < patternLength) {
-      const char = pattern[i] === 'B' ? 'B' : numStr[i];
-      result += char;
-    } else {
-      result += 'B';
+  for (let i = 0; i < intermediateSteps.length; i++) {
+    finalAns.push(intermediateSteps[i].padStart(intermediateStepsWithPadding[i].length, '#'));
+  }
+
+  return finalAns.join('|');
+};
+
+const divisionGrid1Answer = (input: any) => {
+  const { grid_fib_n1, grid_fib_n2, grid1_pre_fills_quotient, grid1_pre_fills_remainder, grid1_div_intermediate_steps_prefills } = input;
+  let errorMsg = '';
+
+  const { intermediateSteps, intermediateStepsWithPadding, quotient, remainder } = getDivGrid1IntermediateStepsQuotientAndRemainder(grid_fib_n1, grid_fib_n2);
+
+  // Validate Intermediate Prefills
+  const intermediatePrefills = (grid1_div_intermediate_steps_prefills || '').split('#').reverse();
+
+  if (
+    intermediateSteps.length !== intermediatePrefills.length ||
+    !Array(intermediateSteps.length)
+      .fill(0)
+      .every((_, index) => intermediateSteps[index].length === intermediatePrefills[index].length)
+  ) {
+    errorMsg = 'Incorrect grid1_div_intermediate_steps_prefills';
+  }
+
+  // Validate Quotient Prefills
+  if (!errorMsg && quotient.length !== grid1_pre_fills_quotient.length) {
+    errorMsg = 'Incorrect grid1_pre_fills_quotient';
+  }
+
+  // Validate Remainder Prefills
+  if (!errorMsg && remainder.length !== grid1_pre_fills_remainder.length) {
+    errorMsg = 'Incorrect grid1_pre_fills_remainder';
+  }
+
+  if (errorMsg) {
+    const errorContext = `grid_fib_n1 = ${grid_fib_n1} & grid_fib_n2 = ${grid_fib_n2}`;
+    throw new Error(`${errorMsg} :: ${errorContext}`);
+  }
+
+  const intermediatePrefillsReverse = ((grid1_div_intermediate_steps_prefills as string) || '').split('#').reverse().join('|');
+  let intermediateStepsPattern = intermediateSteps.join('|');
+
+  for (let i = 0; i < intermediateStepsPattern.length; i++) {
+    if (intermediatePrefillsReverse[i] === 'B') {
+      intermediateStepsPattern = intermediateStepsPattern.replaceAt(i, 'B');
     }
   }
-  return result;
+
+  let answerQuotient = quotient;
+  for (let i = 0; i < grid1_pre_fills_quotient.length; i++) {
+    if (grid1_pre_fills_quotient[i] === 'B') {
+      answerQuotient = answerQuotient.replaceAt(i, 'B');
+    }
+  }
+
+  let answerRemainder = remainder;
+  for (let i = 0; i < grid1_pre_fills_remainder.length; i++) {
+    if (grid1_pre_fills_remainder[i] === 'B') {
+      answerRemainder = answerRemainder.replaceAt(i, 'B');
+    }
+  }
+
+  return {
+    answerIntermediate: getPaddedInterMediateStepsPattern(intermediateStepsPattern.split('|'), intermediateStepsWithPadding), // padding the steps with '#' for proper alignment from LHS
+    answerQuotient,
+    answerRemainder: answerRemainder.padStart(grid_fib_n1.toString().length, '#'), // padding the answer with '#' for proper alignment from LHS
+    result: {
+      quotient,
+      remainder,
+    },
+  };
+};
+
+const divisionFIBAnswer = (input: any) => {
+  const { grid_fib_n1, grid_fib_n2, fib_type } = input;
+
+  let result: any = Math.floor(parseInt(grid_fib_n1) / parseInt(grid_fib_n2));
+
+  if (fib_type === '2') {
+    result = {
+      quotient: Math.floor(parseInt(grid_fib_n1) / parseInt(grid_fib_n2)),
+      remainder: parseInt(grid_fib_n1) % parseInt(grid_fib_n2),
+    };
+  }
+
+  return {
+    result,
+    fib_type,
+  };
 };
 
 export const destroyQuestion = async () => {

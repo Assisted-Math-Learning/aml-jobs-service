@@ -36,6 +36,7 @@ const appConfiguration: IConfiguration = {
   grid1SubFields: get(envVars, 'GRID-1_SUB_FIELDS', 'grid1_show_regroup,grid_fib_n1,grid_fib_n2').split(','),
   grid1MultipleFields: get(envVars, 'GRID-1_MULTIPLE_FIELDS', 'grid_fib_n1,grid_fib_n2').split(','),
   grid1DivFields: get(envVars, 'GRID-1_DIVISION_FIELDS', 'grid_fib_n1,grid_fib_n2').split(','),
+  fibDivFields: get(envVars, 'FIB_DIVISION_FIELDS', 'grid_fib_n1,grid_fib_n2,fib_type').split(','),
   grid2Fields: get(envVars, 'GRID-2_FIELDS', 'grid_fib_n1,grid_fib_n2').split(','),
   fibFields: get(envVars, 'FIB_FIELDS', 'grid_fib_n1,grid_fib_n2').split(','),
   mcqFields: get(envVars, 'MCQ_FIELDS', 'question_text,mcq_question_image,mcq_option_1,mcq_option_2,mcq_option_3,mcq_option_4,mcq_option_5,mcq_option_6,mcq_correct_options').split(','),
