@@ -271,7 +271,7 @@ export const processRow = (rows: any) => {
 };
 
 export const getUniqueValues = (data: any[]): UniqueValues => {
-  const keys = ['l1_skill', 'l2_skill', 'l3_skill', 'board', 'class', 'sub_skills'];
+  const keys = ['l1_skill', 'l2_skill', 'l3_skill', 'board', 'class', 'sub_skills', 'repository_name'];
 
   return _.reduce(
     keys,
@@ -302,8 +302,8 @@ export const checkValidity = async (data: any[]): Promise<{ error: { errStatus: 
       uniqueValues.class,
       classes.flatMap((Class: Class) => Class?.name?.en),
     ),
-    repository: _.difference(
-      uniqueValues.repository || [],
+    repository_name: _.difference(
+      uniqueValues.repository_name || [],
       repositories.flatMap((repo: Board) => repo?.name?.en),
     ),
     l1_skill: _.difference(

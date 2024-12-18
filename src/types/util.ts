@@ -34,13 +34,13 @@ export interface UniqueValues {
   board: string[];
   class: string[];
   sub_skills: string[];
-  repository: string[];
+  repository_name: string[];
 }
 
 export interface Mismatches {
   boards: string[];
   classes: string[];
-  repository: string[];
+  repository_name: string[];
   l1_skill: string[];
   l2_skill: string[];
   l3_skill: string[];
