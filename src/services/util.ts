@@ -243,7 +243,14 @@ export const processRow = (rows: any) => {
         }
 
         // Add fields matching the mcq, fib, grid, n1, n2 pattern to body
-        if (headerName.startsWith('mcq') || headerName.startsWith('fib') || headerName.startsWith('grid') || headerName.includes('n1') || headerName.includes('n2')) {
+        if (
+          headerName.startsWith('mcq') ||
+          headerName.startsWith('fib') ||
+          headerName.startsWith('grid') ||
+          headerName.includes('n1') ||
+          headerName.includes('n2') ||
+          headerName.endsWith('question_image')
+        ) {
           row.body[headerName] = cellValue ? String(cellValue) : '';
         } else if (headerName?.includes('media_file')) {
           row.media_files = row?.media_files || [];
