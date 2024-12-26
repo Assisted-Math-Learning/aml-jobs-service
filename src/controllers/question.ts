@@ -7,11 +7,12 @@ import { appConfiguration } from '../config';
 import { createQuestion, deleteQuestions } from '../services/question';
 import { checkValidity, convertToCSV, getCSVHeaderAndRow, getCSVTemplateHeader, preloadData, processRow, validateHeader } from '../services/util';
 import { Status } from '../enums/status';
+import { FibType } from '../enums/fibType';
 
 let mediaFileEntries: any[];
 let processId: string;
 
-const { grid1AddFields, grid1DivFields, grid1MultipleFields, grid1SubFields, grid2Fields, fibDivFields, mcqFields, fibFields, questionBodyFields, mediaFields, requiredMetaFields } = appConfiguration;
+const { grid1AddFields, grid1DivFields, grid1MultipleFields, grid1SubFields, grid2Fields, mcqFields, fibFields, questionBodyFields, mediaFields, requiredMetaFields } = appConfiguration;
 
 export const handleQuestionCsv = async (questionsCsv: object[], media: any, process_id: string) => {
   processId = process_id;
@@ -253,10 +254,10 @@ const validateStagedQuestionData = async () => {
         break;
       case `Mcq`:
         requiredFields = mcqFields;
-        requiredData = 'question_text,mcq_question_image,mcq_option_1,mcq_option_2,mcq_option_3,mcq_option_4,mcq_option_5,mcq_option_6,mcq_correct_options';
+        requiredData = 'question_text,question_image,mcq_option_1,mcq_option_2,mcq_option_3,mcq_option_4,mcq_option_5,mcq_option_6,mcq_correct_options';
         break;
       case `Fib`:
-        requiredFields = l1_skill === 'Division' ? fibDivFields : fibFields;
+        requiredFields = fibFields;
         break;
       default:
         requiredFields = [];
@@ -374,19 +375,19 @@ const processQuestionMediaFiles = async () => {
       }
       const {
         question_type,
-        body: { mcq_question_image = null },
+        body: { question_image = null },
       } = question;
-      if (question_type?.toLowerCase() === 'mcq' && mcq_question_image) {
+      if (question_type?.toLowerCase() === 'mcq' && question_image) {
         const foundImage = mediaFileEntries.slice(1).find((media: any) => {
-          return media?.entryName?.split('/')[1] === mcq_question_image;
+          return media?.entryName?.split('/')[1] === question_image;
         });
 
         if (foundImage) {
           const imageData = await uploadMediaFile(foundImage, 'question');
           if (!imageData) {
-            logger.error(`Image upload failed for ${mcq_question_image}`);
+            logger.error(`Image upload failed for ${question_image}`);
           }
-          const body = { ...question.body, mcq_question_image: imageData };
+          const body = { ...question.body, question_image: imageData };
           const updateContent = await updateQuestionStage({ id: question.id }, { body: body });
           if (updateContent?.error) {
             logger.error('Question Media upload:: Media validation failed');
@@ -489,11 +490,9 @@ const processQuestionStage = (questionsData: any) => {
     'Grid-2': [...grid2Fields, 'grid2_pre_fills_n1', 'grid2_pre_fills_n2'],
     Mcq: mcqFields,
     Fib: fibFields,
-    Fib_Division: fibDivFields,
   };
   questionsData.forEach((question: any) => {
-    const questionType =
-      question?.question_type === 'Grid-1' || (question?.l1_skill === 'Division' && question?.question_type === 'Fib') ? `${question?.question_type}_${question?.l1_skill}` : question?.question_type;
+    const questionType = question?.question_type === 'Grid-1' ? `${question?.question_type}_${question?.l1_skill}` : question?.question_type;
     const relevantFields = fieldMapping[questionType];
     const filteredBody: any = {};
     relevantFields.forEach((field: any) => {
@@ -522,7 +521,7 @@ const formatQuestionStageData = async (stageData: any[]) => {
         mcq_option_4 = null,
         mcq_option_5 = null,
         mcq_option_6 = null,
-        mcq_question_image = null,
+        question_image = null,
         mcq_correct_options = null,
       } = obj?.body || {};
       const transferData = {
@@ -544,11 +543,11 @@ const formatQuestionStageData = async (stageData: any[]) => {
         sub_skills: obj?.sub_skill?.map((subSkill: string) => subSkills.find((sub: any) => sub?.name?.en === subSkill)).filter((option: any) => !_.isEmpty(option)),
         question_body: {
           numbers: { n1: grid_fib_n1, n2: grid_fib_n2 },
-          question_image: mcq_question_image,
+          question_image: question_image,
           options:
             obj?.question_type?.toLowerCase() === 'mcq' ? [mcq_option_1, mcq_option_2, mcq_option_3, mcq_option_4, mcq_option_5, mcq_option_6].filter((option) => !_.isEmpty(option)) : undefined,
           correct_option: obj?.question_type?.toLowerCase() === 'mcq' ? mcq_correct_options : undefined,
-          answers: getAnswer(obj?.l1_skill, grid_fib_n1, grid_fib_n2, obj?.question_type, obj?.body, obj?.question_type),
+          answers: getAnswer(obj?.l1_skill, obj?.question_type, obj?.body),
           wrong_answer: convertWrongAnswerSubSkills({ carry: obj?.sub_skill_carry, procedural: obj?.sub_skill_procedural, x_plus_x: obj?.sub_skill_x_plus_0, x_plus_0: obj?.sub_skill_x_plus_x }),
         },
         benchmark_time: obj?.benchmark_time,
@@ -587,7 +586,20 @@ const convertWrongAnswerSubSkills = (inputData: any) => {
   return wrongAnswers;
 };
 
-const getAnswer = (skill: string, num1: string, num2: string, type: string, bodyObject: any, question_type: string) => {
+const getAnswer = (skill: string, question_type: string, bodyObject: any) => {
+  if (question_type === 'Fib') {
+    const { fib_type, fib_answer, question_image } = bodyObject;
+    if (!fib_type || !Object.values(FibType).includes(fib_type)) {
+      throw new Error(`Invalid value for fib_type :: ${fib_type}`);
+    }
+    if ([FibType.FIB_STANDARD_WITH_IMAGE, FibType.FIB_QUOTIENT_REMAINDER_WITH_IMAGE].includes(fib_type) && !question_image) {
+      throw new Error(`Missing value for question_image for fib_type :: ${fib_type}`);
+    }
+    if ([FibType.FIB_STANDARD_WITH_IMAGE, FibType.FIB_QUOTIENT_REMAINDER_WITH_IMAGE].includes(fib_type) && !fib_answer) {
+      throw new Error(`Missing value for fib_answer for question_image :: ${question_image}`);
+    }
+  }
+
   switch (`${skill}_${question_type}`) {
     case 'Addition_Grid-1':
       return addGrid1Answer(bodyObject);
@@ -679,9 +691,18 @@ const addGrid1Answer = (input: any) => {
 };
 
 const addFIBAnswer = (input: any) => {
-  const { grid_fib_n1, grid_fib_n2 } = input;
+  const { grid_fib_n1, grid_fib_n2, fib_type, fib_answer } = input;
+
+  if (fib_type === FibType.FIB_STANDARD_WITH_IMAGE) {
+    return {
+      result: fib_answer,
+      fib_type,
+    };
+  }
+
   return {
     result: parseInt(grid_fib_n1) + parseInt(grid_fib_n2),
+    fib_type,
   };
 };
 
@@ -795,9 +816,18 @@ const subGrid1Answer = (input: any) => {
 };
 
 const subFIBAnswer = (input: any) => {
-  const { grid_fib_n1, grid_fib_n2 } = input;
+  const { grid_fib_n1, grid_fib_n2, fib_type, fib_answer } = input;
+
+  if (fib_type === FibType.FIB_STANDARD_WITH_IMAGE) {
+    return {
+      result: fib_answer,
+      fib_type,
+    };
+  }
+
   return {
     result: parseInt(grid_fib_n1) - parseInt(grid_fib_n2),
+    fib_type,
   };
 };
 
@@ -868,10 +898,18 @@ const multiplicationGrid1Answer = (input: any) => {
 };
 
 const multiplicationFIBAnswer = (input: any) => {
-  const { grid_fib_n1, grid_fib_n2 } = input;
+  const { grid_fib_n1, grid_fib_n2, fib_type, fib_answer } = input;
+
+  if (fib_type === FibType.FIB_STANDARD_WITH_IMAGE) {
+    return {
+      result: fib_answer,
+      fib_type,
+    };
+  }
 
   return {
     result: parseInt(grid_fib_n1) * parseInt(grid_fib_n2),
+    fib_type,
   };
 };
 
@@ -1027,11 +1065,18 @@ const divisionGrid1Answer = (input: any) => {
 };
 
 const divisionFIBAnswer = (input: any) => {
-  const { grid_fib_n1, grid_fib_n2, fib_type } = input;
+  const { grid_fib_n1, grid_fib_n2, fib_type, fib_answer } = input;
+
+  if ([FibType.FIB_STANDARD_WITH_IMAGE, FibType.FIB_QUOTIENT_REMAINDER_WITH_IMAGE].includes(fib_type)) {
+    return {
+      result: fib_answer,
+      fib_type,
+    };
+  }
 
   let result: any = Math.floor(parseInt(grid_fib_n1) / parseInt(grid_fib_n2));
 
-  if (fib_type === '2') {
+  if (fib_type === FibType.FIB_QUOTIENT_REMAINDER) {
     result = {
       quotient: Math.floor(parseInt(grid_fib_n1) / parseInt(grid_fib_n2)),
       remainder: parseInt(grid_fib_n1) % parseInt(grid_fib_n2),

@@ -36,10 +36,9 @@ const appConfiguration: IConfiguration = {
   grid1SubFields: get(envVars, 'GRID-1_SUB_FIELDS', 'grid1_show_regroup,grid_fib_n1,grid_fib_n2').split(','),
   grid1MultipleFields: get(envVars, 'GRID-1_MULTIPLE_FIELDS', 'grid_fib_n1,grid_fib_n2').split(','),
   grid1DivFields: get(envVars, 'GRID-1_DIVISION_FIELDS', 'grid_fib_n1,grid_fib_n2').split(','),
-  fibDivFields: get(envVars, 'FIB_DIVISION_FIELDS', 'grid_fib_n1,grid_fib_n2,fib_type').split(','),
   grid2Fields: get(envVars, 'GRID-2_FIELDS', 'grid_fib_n1,grid_fib_n2').split(','),
-  fibFields: get(envVars, 'FIB_FIELDS', 'grid_fib_n1,grid_fib_n2').split(','),
-  mcqFields: get(envVars, 'MCQ_FIELDS', 'question_text,mcq_question_image,mcq_option_1,mcq_option_2,mcq_option_3,mcq_option_4,mcq_option_5,mcq_option_6,mcq_correct_options').split(','),
+  fibFields: get(envVars, 'FIB_FIELDS', 'grid_fib_n1,grid_fib_n2,fib_type,fib_answer,question_image').split(','),
+  mcqFields: get(envVars, 'MCQ_FIELDS', 'question_text,question_image,mcq_option_1,mcq_option_2,mcq_option_3,mcq_option_4,mcq_option_5,mcq_option_6,mcq_correct_options').split(','),
   templateFileName: get(envVars, 'TEMPLATE_FILE_NAME', 'bulk_upload.zip'),
   templateFolder: get(envVars, 'TEMPLATE_FOLDER', 'template'),
   bulkUploadFolder: get(envVars, 'BULK_UPLOAD_FOLDER', 'upload'),
@@ -52,7 +51,7 @@ const appConfiguration: IConfiguration = {
   questionBodyFields: get(
     envVars,
     'QUESTION_BODY_FIELDS',
-    'mcq_question_image,grid1_show_carry,grid_fib_n1,grid_fib_n2,mcq_option_1,mcq_option_2,mcq_option_3,mcq_option_4,mcq_option_5,mcq_option_6,mcq_correct_options,grid2_pre_fills_n1,grid2_pre_fills_n2,grid1_pre_fills_top,grid1_pre_fills_result,grid1_pre_fills_remainder,grid1_pre_fills_quotient,grid1_multiply_intermediate_steps_prefills,grid1_pre_fills_result',
+    'question_image,grid1_show_carry,grid_fib_n1,grid_fib_n2,fib_type,fib_answer,mcq_option_1,mcq_option_2,mcq_option_3,mcq_option_4,mcq_option_5,mcq_option_6,mcq_correct_options,grid2_pre_fills_n1,grid2_pre_fills_n2,grid1_pre_fills_top,grid1_pre_fills_result,grid1_pre_fills_remainder,grid1_pre_fills_quotient,grid1_multiply_intermediate_steps_prefills,grid1_pre_fills_result',
   ).split(','),
   mediaFields: get(envVars, 'MEDIA_FIELDS', 'media_file_1,media_file_2,media_file_3,media_file_4,media_file_5').split(','),
   requiredMetaFields: get(

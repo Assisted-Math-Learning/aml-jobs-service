@@ -27,7 +27,6 @@ export interface IConfiguration {
   grid1SubFields: string[];
   grid1MultipleFields: string[];
   grid1DivFields: string[];
-  fibDivFields: string[];
   grid2Fields: string[];
   fibFields: string[];
   mcqFields: string[];
