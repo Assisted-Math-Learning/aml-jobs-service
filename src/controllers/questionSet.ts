@@ -8,6 +8,7 @@ import { Status } from '../enums/status';
 import { questionStageMetaData } from '../services/questionStage';
 import { contentStageMetaData } from '../services/contentStage';
 import { appConfiguration } from '../config';
+import { QuestionSetPurposeType } from '../enums/questionSetPurposeType';
 
 let processId: string;
 const { requiredMetaFields } = appConfiguration;
@@ -343,6 +344,7 @@ const formatStagedQuestionSetData = async (stageData: any[]) => {
         status: 'live',
         created_by: 'system',
         is_active: true,
+        enable_feedback: obj?.purpose !== QuestionSetPurposeType.MAIN_DIAGNOSTIC,
       };
       return transferData;
     }),
