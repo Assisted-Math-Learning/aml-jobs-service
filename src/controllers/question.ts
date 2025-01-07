@@ -377,7 +377,7 @@ const processQuestionMediaFiles = async () => {
         question_type,
         body: { question_image = null },
       } = question;
-      if (question_type?.toLowerCase() === 'mcq' && question_image) {
+      if (['mcq', 'fib'].includes(question_type?.toLowerCase()) && question_image) {
         const foundImage = mediaFileEntries.slice(1).find((media: any) => {
           return media?.entryName?.split('/')[1] === question_image;
         });
