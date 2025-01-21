@@ -9,9 +9,14 @@ export const Question = AppDataSource.define(
       primaryKey: true,
       autoIncrement: true,
     },
+    x_id: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
     identifier: {
       type: DataTypes.STRING,
       allowNull: false,
+      unique: true,
     },
     benchmark_time: {
       type: DataTypes.INTEGER,

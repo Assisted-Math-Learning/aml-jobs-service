@@ -2,8 +2,8 @@ import logger from '../utils/logger';
 import * as _ from 'lodash';
 import { updateProcess } from '../services/process';
 import { createQuestionSetStage, getAllStageQuestionSet, questionSetStageMetaData, updateQuestionStageSet } from '../services/questionSetStage';
-import { createQuestionSet, deleteQuestionSets } from '../services/questionSet';
-import { getCSVTemplateHeader, getCSVHeaderAndRow, validateHeader, processRow, convertToCSV, preloadData, checkValidity } from '../services/util';
+import { createQuestionSet, deleteQuestionSets, findExistingQuestionSetXIDs } from '../services/questionSet';
+import { checkValidity, convertToCSV, getCSVHeaderAndRow, getCSVTemplateHeader, preloadData, processRow, validateHeader } from '../services/util';
 import { Status } from '../enums/status';
 import { questionStageMetaData } from '../services/questionStage';
 import { contentStageMetaData } from '../services/contentStage';
@@ -39,7 +39,7 @@ export const handleQuestionSetCsv = async (questionSetsCsv: object[], process_id
     if (!validatedRowData?.result?.isValid) return validatedRowData;
     const { result } = validatedRowData;
 
-    questionSetsData = questionSetsData.concat(result.data);
+    questionSetsData = questionSetsData.concat(result.data).map((datum: any) => ({ ...datum, x_id: datum.question_set_id }));
     if (questionSetsData?.length === 0) {
       logger.error('Error while processing the question set csv data');
       return {
@@ -291,6 +291,19 @@ export const migrateToMainQuestionSet = async () => {
       },
     };
   }
+  const stageQuestionSetXIDs: string[] = insertData.map((datum) => datum.x_id);
+  const existingXIDs = (await findExistingQuestionSetXIDs(stageQuestionSetXIDs)).map((datum: any) => datum.x_id);
+  const commonXIDs = _.intersection(stageQuestionSetXIDs, existingXIDs);
+  if (commonXIDs.length) {
+    logger.error(`Insert Question set main:: ${processId} question set bulk data error in inserting to main table.`);
+    return {
+      error: { errStatus: 'errored', errMsg: `error while inserting staging data to question set table :: Following question_set_id(s) already exist in the system: ${commonXIDs.join(', ')}` },
+      result: {
+        isValid: false,
+        data: null,
+      },
+    };
+  }
   const insertedQuestionSets = await createQuestionSet(insertData);
   if (insertedQuestionSets?.error) {
     logger.error(`Insert Question set main:: ${processId} question set data error in inserting to main table .`);
@@ -315,11 +328,12 @@ export const migrateToMainQuestionSet = async () => {
 const formatStagedQuestionSetData = async (stageData: any[]) => {
   const { boards, classes, skills, subSkills, repositories } = await preloadData();
   const transformedData = await Promise.all(
-    stageData.map(async (obj) => {
+    _.uniqBy(stageData, 'x_id').map(async (obj) => {
       const contentData = await mapContentsToQuestionSet(obj);
       const questionList = await mapQuestionToQuestionSet(obj.question_set_id);
       const SubSkills = obj?.sub_skills.map((subSkill: string) => subSkills.find((sub: any) => sub.name.en === subSkill)).filter((sub: any) => sub);
-      const transferData = {
+      return {
+        x_id: obj.x_id,
         identifier: obj.identifier,
         content_ids: contentData,
         questions: questionList,
@@ -346,7 +360,6 @@ const formatStagedQuestionSetData = async (stageData: any[]) => {
         is_active: true,
         enable_feedback: obj?.purpose !== QuestionSetPurposeType.MAIN_DIAGNOSTIC,
       };
-      return transferData;
     }),
   );
   logger.info('Data transfer:: staging Data transferred as per original format');

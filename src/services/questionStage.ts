@@ -10,9 +10,10 @@ export const createQuestionStage = async (insertData: Array<Record<string, any>>
     const [dataValues] = stagingData;
     return { error: false, dataValues };
   } catch (error: any) {
+    const fields = error?.fields;
     await transact.rollback();
     logger.error(error?.message);
-    return { error: true, message: error?.message };
+    return { error: true, message: `${error?.original?.message} ${fields ? JSON.stringify(fields) : ''}`.trim() };
   }
 };
 

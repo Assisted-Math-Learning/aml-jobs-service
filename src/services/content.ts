@@ -50,3 +50,14 @@ export const deleteContents = async (whereClause: any): Promise<any> => {
     return { error: true, message: errorMsg };
   }
 };
+
+export const findExistingContentXIDs = async (xids: string[]): Promise<any> => {
+  return Content.findAll({
+    where: {
+      x_id: xids,
+    },
+    raw: true,
+    attributes: ['x_id'],
+    group: 'x_id',
+  });
+};

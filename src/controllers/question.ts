@@ -4,7 +4,7 @@ import { uploadMediaFile } from '../services/awsService';
 import { updateProcess } from '../services/process';
 import { createQuestionStage, getAllStageQuestion, questionStageMetaData, updateQuestionStage } from '../services/questionStage';
 import { appConfiguration } from '../config';
-import { createQuestion, deleteQuestions } from '../services/question';
+import { createQuestion, deleteQuestions, findExistingQuestionXIDs } from '../services/question';
 import { checkValidity, convertToCSV, getCSVHeaderAndRow, getCSVTemplateHeader, preloadData, processRow, validateHeader } from '../services/util';
 import { Status } from '../enums/status';
 import { FibType } from '../enums/fibType';
@@ -55,6 +55,7 @@ export const handleQuestionCsv = async (questionsCsv: object[], media: any, proc
 
   const questionsDataForStage = questionsData.map((data) => ({
     ...data,
+    x_id: data.QID,
     question_text: { en: data?.question_text_en || data?.question_text || '', kn: data?.question_text_kn || '' },
     description: { en: data?.description_en || data?.description || '', kn: data?.description_kn || '' },
   }));
@@ -460,6 +461,19 @@ export const migrateToMainQuestion = async () => {
       },
     };
   }
+  const stageQuestionsXIDs: string[] = insertData.map((datum) => datum.x_id);
+  const existingXIDs = (await findExistingQuestionXIDs(stageQuestionsXIDs)).map((datum: any) => datum.x_id);
+  const commonXIDs = _.intersection(stageQuestionsXIDs, existingXIDs);
+  if (commonXIDs.length) {
+    logger.error(`Insert Question main:: ${processId} question bulk data error in inserting to main table.`);
+    return {
+      error: { errStatus: 'errored', errMsg: `error while inserting staging data to question table :: Following QID(s) already exist in the system: ${commonXIDs.join(', ')}` },
+      result: {
+        isValid: false,
+        data: null,
+      },
+    };
+  }
   const questionInsert = await createQuestion(insertData);
   if (questionInsert?.error) {
     logger.error(`Insert Question main:: ${processId} question bulk data error in inserting to main table.`);
@@ -524,8 +538,9 @@ const formatQuestionStageData = async (stageData: any[]) => {
         question_image = null,
         mcq_correct_options = null,
       } = obj?.body || {};
-      const transferData = {
+      return {
         identifier: obj.identifier,
+        x_id: obj?.x_id,
         question_type: obj?.question_type,
         operation: obj?.l1_skill,
         hints: obj?.hint,
@@ -542,6 +557,7 @@ const formatQuestionStageData = async (stageData: any[]) => {
         },
         sub_skills: obj?.sub_skill?.map((subSkill: string) => subSkills.find((sub: any) => sub?.name?.en === subSkill)).filter((option: any) => !_.isEmpty(option)),
         question_body: {
+          ...(obj?.body || {}),
           numbers: { n1: grid_fib_n1, n2: grid_fib_n2 },
           question_image: question_image,
           options:
@@ -556,8 +572,9 @@ const formatQuestionStageData = async (stageData: any[]) => {
         created_by: 'system',
         is_active: true,
       };
-      return transferData;
     });
+
+    // transformedData = _.uniqBy(transformedData, 'x_id');
 
     logger.info('Data transfer:: staging Data transferred as per original format');
     return transformedData;
