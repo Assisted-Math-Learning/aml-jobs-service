@@ -39,7 +39,7 @@ export const handleContentCsv = async (contentsCsv: object[], media: any, proces
     if (!validatedContentRows?.result?.isValid) return validatedContentRows;
     const { result } = validatedContentRows;
 
-    contentsData = contentsData.concat(result.data).map((datum: any) => ({ ...datum, x_id: datum.content_id }));
+    contentsData = contentsData.concat(result.data);
     if (contentsData?.length === 0) {
       logger.error('Error while processing the content csv data');
       return {
@@ -394,7 +394,7 @@ const formatStagedContentData = async (stageData: any[]) => {
   const transformedData = stageData.map((obj) => {
     return {
       identifier: obj.identifier,
-      x_id: obj?.x_id,
+      x_id: obj?.content_id,
       name: { en: obj?.title || obj?.question_text },
       description: { en: obj?.description },
       tenant: '',

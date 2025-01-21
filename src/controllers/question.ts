@@ -55,7 +55,7 @@ export const handleQuestionCsv = async (questionsCsv: object[], media: any, proc
 
   const questionsDataForStage = questionsData.map((data) => ({
     ...data,
-    x_id: data.QID,
+    question_id: data.QID,
     question_text: { en: data?.question_text_en || data?.question_text || '', kn: data?.question_text_kn || '' },
     description: { en: data?.description_en || data?.description || '', kn: data?.description_kn || '' },
   }));
@@ -540,7 +540,7 @@ const formatQuestionStageData = async (stageData: any[]) => {
       } = obj?.body || {};
       return {
         identifier: obj.identifier,
-        x_id: obj?.x_id,
+        x_id: obj?.question_id,
         question_type: obj?.question_type,
         operation: obj?.l1_skill,
         hints: obj?.hint,
