@@ -30,10 +30,6 @@ export const QuestionSet = AppDataSource.define(
       type: DataTypes.JSONB,
       allowNull: true,
     },
-    questions: {
-      type: DataTypes.JSONB,
-      allowNull: true,
-    },
     sequence: {
       type: DataTypes.INTEGER,
       allowNull: false,

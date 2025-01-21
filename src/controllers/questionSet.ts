@@ -7,8 +7,9 @@ import { checkValidity, convertToCSV, getCSVHeaderAndRow, getCSVTemplateHeader, 
 import { Status } from '../enums/status';
 import { questionStageMetaData } from '../services/questionStage';
 import { contentStageMetaData } from '../services/contentStage';
-import { appConfiguration } from '../config';
+import { appConfiguration, AppDataSource } from '../config';
 import { QuestionSetPurposeType } from '../enums/questionSetPurposeType';
+import { createQuestionSetQuestionMapping } from '../services/questionSetQuestionMapping';
 
 let processId: string;
 const { requiredMetaFields } = appConfiguration;
@@ -39,7 +40,7 @@ export const handleQuestionSetCsv = async (questionSetsCsv: object[], process_id
     if (!validatedRowData?.result?.isValid) return validatedRowData;
     const { result } = validatedRowData;
 
-    questionSetsData = questionSetsData.concat(result.data).map((datum: any) => ({ ...datum, x_id: datum.question_set_id }));
+    questionSetsData = questionSetsData.concat(result.data);
     if (questionSetsData?.length === 0) {
       logger.error('Error while processing the question set csv data');
       return {
@@ -281,7 +282,7 @@ export const migrateToMainQuestionSet = async () => {
       },
     };
   }
-  const insertData = await formatStagedQuestionSetData(getAllQuestionSetStage);
+  const { transformedData: insertData, questionSetQuestionMappings } = await formatStagedQuestionSetData(getAllQuestionSetStage);
   if (insertData.length === 0) {
     return {
       error: { errStatus: 'process_stage_data', errMsg: 'Error in formatting staging data question set to main table.' },
@@ -304,9 +305,12 @@ export const migrateToMainQuestionSet = async () => {
       },
     };
   }
-  const insertedQuestionSets = await createQuestionSet(insertData);
-  if (insertedQuestionSets?.error) {
+  const transaction = await AppDataSource.transaction();
+  const insertedQuestionSets = await createQuestionSet(insertData, transaction);
+  const insertedMappings = await createQuestionSetQuestionMapping(questionSetQuestionMappings, transaction);
+  if (insertedQuestionSets?.error || insertedMappings?.result) {
     logger.error(`Insert Question set main:: ${processId} question set data error in inserting to main table .`);
+    await transaction.rollback();
     return {
       error: { errStatus: 'errored', errMsg: `question set bulk data error in inserting .` },
       result: {
@@ -315,6 +319,7 @@ export const migrateToMainQuestionSet = async () => {
       },
     };
   }
+  await transaction.commit();
 
   return {
     error: { errStatus: null, errMsg: null },
@@ -327,63 +332,65 @@ export const migrateToMainQuestionSet = async () => {
 
 const formatStagedQuestionSetData = async (stageData: any[]) => {
   const { boards, classes, skills, subSkills, repositories } = await preloadData();
-  const transformedData = await Promise.all(
-    _.uniqBy(stageData, 'x_id').map(async (obj) => {
-      const contentData = await mapContentsToQuestionSet(obj);
-      const questionList = await mapQuestionToQuestionSet(obj.question_set_id);
-      const SubSkills = obj?.sub_skills.map((subSkill: string) => subSkills.find((sub: any) => sub.name.en === subSkill)).filter((sub: any) => sub);
-      return {
-        x_id: obj.x_id,
-        identifier: obj.identifier,
-        content_ids: contentData,
-        questions: questionList,
-        instruction_text: obj?.instruction_text ?? '',
-        sequence: obj?.sequence,
-        title: { en: obj?.title || obj?.question_text },
-        description: { en: obj?.description },
-        tenant: '',
-        repository: repositories.find((repository: any) => repository?.name?.en === obj?.repository_name),
-        taxonomy: {
-          board: boards.find((board: any) => board?.name?.en === obj?.board),
-          class: classes.find((Class: any) => Class?.name?.en === obj?.class),
-          l1_skill: skills.find((skill: any) => skill?.name?.en == obj?.l1_skill),
-          l2_skill: obj?.l2_skill.map((skill: string) => skills.find((Skill: any) => Skill?.name?.en === skill)),
-          l3_skill: obj?.l3_skill.map((skill: string) => skills.find((Skill: any) => Skill?.name?.en === skill)),
-        },
-        sub_skills: SubSkills ?? null,
-        purpose: obj?.purpose,
-        is_atomic: obj?.is_atomic,
-        gradient: obj?.gradient,
-        group_name: obj.group_name ? obj.group_name : null,
-        status: 'live',
-        created_by: 'system',
-        is_active: true,
-        enable_feedback: obj?.purpose !== QuestionSetPurposeType.MAIN_DIAGNOSTIC,
-      };
-    }),
-  );
+  const transformedData = [];
+  let questionSetQuestionMappings: any[] = [];
+  for (const obj of stageData) {
+    const contentData = await mapContentsToQuestionSet(obj);
+    const currentQuestionSetQuestionMapping = await mapQuestionToQuestionSet(obj.question_set_id, obj.identifier);
+    const SubSkills = obj?.sub_skills.map((subSkill: string) => subSkills.find((sub: any) => sub.name.en === subSkill)).filter((sub: any) => sub);
+    const transformedDatum = {
+      x_id: obj.question_set_id,
+      identifier: obj.identifier,
+      content_ids: contentData,
+      instruction_text: obj?.instruction_text ?? '',
+      sequence: obj?.sequence,
+      title: { en: obj?.title || obj?.question_text },
+      description: { en: obj?.description },
+      tenant: '',
+      repository: repositories.find((repository: any) => repository?.name?.en === obj?.repository_name),
+      taxonomy: {
+        board: boards.find((board: any) => board?.name?.en === obj?.board),
+        class: classes.find((Class: any) => Class?.name?.en === obj?.class),
+        l1_skill: skills.find((skill: any) => skill?.name?.en == obj?.l1_skill),
+        l2_skill: obj?.l2_skill.map((skill: string) => skills.find((Skill: any) => Skill?.name?.en === skill)),
+        l3_skill: obj?.l3_skill.map((skill: string) => skills.find((Skill: any) => Skill?.name?.en === skill)),
+      },
+      sub_skills: SubSkills ?? null,
+      purpose: obj?.purpose,
+      is_atomic: obj?.is_atomic,
+      gradient: obj?.gradient,
+      group_name: obj.group_name ? obj.group_name : null,
+      status: currentQuestionSetQuestionMapping.length ? 'live' : 'draft',
+      created_by: 'system',
+      is_active: true,
+      enable_feedback: obj?.purpose !== QuestionSetPurposeType.MAIN_DIAGNOSTIC,
+    };
+    transformedData.push(transformedDatum);
+    questionSetQuestionMappings = [...questionSetQuestionMappings, ...currentQuestionSetQuestionMapping];
+  }
   logger.info('Data transfer:: staging Data transferred as per original format');
-  return transformedData;
+  return { transformedData, questionSetQuestionMappings };
 };
 
-const mapQuestionToQuestionSet = async (question_set_id: string) => {
-  const questionsObj: any[] = [];
-  const getAllQuestionStage = await questionStageMetaData({ process_id: processId, question_set_id });
+const mapQuestionToQuestionSet = async (question_set_x_id: string, question_set_id: string) => {
+  const mappings: any[] = [];
+  const getAllQuestionStage = await questionStageMetaData({ process_id: processId, question_set_id: question_set_x_id });
 
   if (getAllQuestionStage.error) {
-    return questionsObj;
+    return mappings;
   }
 
   for (const question of getAllQuestionStage) {
-    const { id = null, identifier = null, sequence = null } = question;
-    questionsObj.push({
-      id,
-      identifier,
+    const { identifier = null, sequence = null } = question;
+    mappings.push({
+      question_id: identifier,
+      question_set_id,
       sequence,
+      created_by: 'system',
     });
   }
 
-  return questionsObj;
+  return mappings;
 };
 
 const mapContentsToQuestionSet = async (obj: any) => {

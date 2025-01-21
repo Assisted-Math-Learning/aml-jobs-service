@@ -1,16 +1,12 @@
-import { Op, Sequelize } from 'sequelize';
-import { AppDataSource } from '../config';
+import { Op, Sequelize, Transaction } from 'sequelize';
 import { QuestionSet } from '../models/questionSet';
 import logger from '../utils/logger';
 
-export const createQuestionSet = async (insertData: Array<Record<string, any>>): Promise<any> => {
-  const transact = await AppDataSource.transaction();
+export const createQuestionSet = async (insertData: Array<Record<string, any>>, transaction: Transaction): Promise<any> => {
   try {
-    await QuestionSet.bulkCreate(insertData, { transaction: transact });
-    await transact.commit();
+    await QuestionSet.bulkCreate(insertData, { transaction });
     return { error: false, message: 'success' };
   } catch (error: any) {
-    await transact.rollback();
     logger.error(error);
     const err = error instanceof Error;
     const errorMsg = err ? error.message || 'failed to create a record' : '';
