@@ -9,9 +9,14 @@ export const QuestionSetStage = AppDataSource.define(
       primaryKey: true,
       autoIncrement: true,
     },
+    x_id: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
     identifier: {
       type: DataTypes.STRING,
       allowNull: true,
+      unique: true,
     },
     process_id: {
       type: DataTypes.UUID,

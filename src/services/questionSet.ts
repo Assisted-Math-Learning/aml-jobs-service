@@ -9,7 +9,7 @@ export const createQuestionSet = async (insertData: Array<Record<string, any>>):
     await QuestionSet.bulkCreate(insertData, { transaction: transact });
     await transact.commit();
     return { error: false, message: 'success' };
-  } catch (error) {
+  } catch (error: any) {
     await transact.rollback();
     logger.error(error);
     const err = error instanceof Error;
@@ -49,4 +49,15 @@ export const deleteQuestionSets = async (whereClause: any): Promise<any> => {
     const errorMsg = err ? error.message || 'failed to delete records' : '';
     return { error: true, message: errorMsg };
   }
+};
+
+export const findExistingQuestionSetXIDs = async (xids: string[]): Promise<any> => {
+  return QuestionSet.findAll({
+    where: {
+      x_id: xids,
+    },
+    raw: true,
+    attributes: ['x_id'],
+    group: 'x_id',
+  });
 };

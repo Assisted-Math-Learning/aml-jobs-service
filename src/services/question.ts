@@ -36,3 +36,14 @@ export const deleteQuestions = async (whereClause: any): Promise<any> => {
     return { error: true, message: errorMsg };
   }
 };
+
+export const findExistingQuestionXIDs = async (xids: string[]): Promise<any> => {
+  return Question.findAll({
+    where: {
+      x_id: xids,
+    },
+    raw: true,
+    attributes: ['x_id'],
+    group: 'x_id',
+  });
+};

@@ -3,8 +3,8 @@ import * as _ from 'lodash';
 import { uploadMediaFile } from '../services/awsService';
 import { updateProcess } from '../services/process';
 import { contentStageMetaData, createContentStage, getAllStageContent, updateContentStage } from '../services/contentStage';
-import { createContent, deleteContents } from '../services/content';
-import { getCSVTemplateHeader, getCSVHeaderAndRow, validateHeader, processRow, convertToCSV, preloadData, checkValidity } from '../services/util';
+import { createContent, deleteContents, findExistingContentXIDs } from '../services/content';
+import { checkValidity, convertToCSV, getCSVHeaderAndRow, getCSVTemplateHeader, preloadData, processRow, validateHeader } from '../services/util';
 import { Status } from '../enums/status';
 import { appConfiguration } from '../config';
 
@@ -39,7 +39,7 @@ export const handleContentCsv = async (contentsCsv: object[], media: any, proces
     if (!validatedContentRows?.result?.isValid) return validatedContentRows;
     const { result } = validatedContentRows;
 
-    contentsData = contentsData.concat(result.data);
+    contentsData = contentsData.concat(result.data).map((datum: any) => ({ ...datum, x_id: datum.content_id }));
     if (contentsData?.length === 0) {
       logger.error('Error while processing the content csv data');
       return {
@@ -355,6 +355,19 @@ export const migrateToMainContent = async () => {
       },
     };
   }
+  const stageContentXIDs: string[] = insertData.map((datum) => datum.x_id);
+  const existingXIDs = (await findExistingContentXIDs(stageContentXIDs)).map((datum: any) => datum.x_id);
+  const commonXIDs = _.intersection(stageContentXIDs, existingXIDs);
+  if (commonXIDs.length) {
+    logger.error(`Insert Content main:: ${processId} content bulk data error in inserting to main table.`);
+    return {
+      error: { errStatus: 'errored', errMsg: `error while inserting staging data to content table :: Following content_id(s) already exist in the system: ${commonXIDs.join(', ')}` },
+      result: {
+        isValid: false,
+        data: null,
+      },
+    };
+  }
   const contentInsert = await createContent(insertData);
   if (contentInsert?.error) {
     logger.error(`Insert Content main:: ${processId} content bulk data error in inserting to main table`);
@@ -379,9 +392,9 @@ const formatStagedContentData = async (stageData: any[]) => {
   const { boards, classes, skills, subSkills, repositories } = await preloadData();
 
   const transformedData = stageData.map((obj) => {
-    const transferData = {
+    return {
       identifier: obj.identifier,
-      content_id: obj?.content_id,
+      x_id: obj?.x_id,
       name: { en: obj?.title || obj?.question_text },
       description: { en: obj?.description },
       tenant: '',
@@ -400,7 +413,6 @@ const formatStagedContentData = async (stageData: any[]) => {
       created_by: 'system',
       is_active: true,
     };
-    return transferData;
   });
   logger.info('Data transfer:: staging Data transferred as per original format');
   return transformedData;
