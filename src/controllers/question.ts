@@ -53,11 +53,22 @@ export const handleQuestionCsv = async (questionsCsv: object[], media: any, proc
     }
   }
 
+  const descriptionFields = Object.keys(questionsData[0]).filter((field) => field.startsWith('description_'));
+  const questionTextFields = Object.keys(questionsData[0]).filter((field) => field.startsWith('question_text_'));
+
   const questionsDataForStage = questionsData.map((data) => ({
     ...data,
     question_id: data.QID,
-    question_text: { en: data?.question_text_en || data?.question_text || '', kn: data?.question_text_kn || '' },
-    description: { en: data?.description_en || data?.description || '', kn: data?.description_kn || '' },
+    question_text: questionTextFields.reduce((agg, curr) => {
+      const languageKey = curr.split('_').pop() as string;
+      _.set(agg, languageKey, data?.[curr]);
+      return agg;
+    }, {}),
+    description: descriptionFields.reduce((agg, curr) => {
+      const languageKey = curr.split('_').pop() as string;
+      _.set(agg, languageKey, data?.[curr]);
+      return agg;
+    }, {}),
   }));
 
   logger.info('Insert question Stage::Questions Data ready for bulk insert');

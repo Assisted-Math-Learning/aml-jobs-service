@@ -110,9 +110,9 @@ const processEachField = (value: any, header: any) => {
   } else if (headerName.includes('sequence')) {
     value = isEmpty(value) ? null : Number(value);
   } else if (headerName.includes('benchmark_time')) {
-    value = isEmpty(value) ? null : Number(value);
+    value = isEmpty(value) ? 100 : Number(value);
     if (isNaN(value)) {
-      value = null;
+      value = 100;
     }
   }
 
