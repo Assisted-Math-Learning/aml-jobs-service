@@ -29,6 +29,7 @@
     "@json2csv/plainjs": "^7.0.6",
     "adm-zip": "^0.5.16",
     "app-root-path": "^3.1.0",
+    "cron": "^3.5.0",
     "json2csv": "^6.0.0-alpha.2",
     "lodash": "^4.17.21",
     "mime-types": "^2.1.35",

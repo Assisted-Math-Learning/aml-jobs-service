@@ -67,3 +67,14 @@ export const getAWSFolderMetaData = async (folderPath: string) => {
     return { error: true, message: errorMsg };
   }
 };
+
+export const uploadBufferToS3 = async (buffer: Buffer, filePath: string, mimeType: string) => {
+  const command = new PutObjectCommand({
+    Bucket: bucketName,
+    Key: filePath,
+    Body: buffer,
+    ContentType: mimeType,
+  });
+
+  await s3Client.send(command);
+};

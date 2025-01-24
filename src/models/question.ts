@@ -87,6 +87,10 @@ export const Question = AppDataSource.define(
       allowNull: false,
       defaultValue: true,
     },
+    question_audio_description: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+    },
   },
   {
     tableName: 'question',

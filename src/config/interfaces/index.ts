@@ -42,4 +42,5 @@ export interface IConfiguration {
   questionBodyFields: string[];
   mediaFields: string[];
   requiredMetaFields: string[];
+  tts_api_url: string;
 }
