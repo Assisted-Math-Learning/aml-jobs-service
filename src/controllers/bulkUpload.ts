@@ -15,6 +15,8 @@ import { Status } from '../enums/status';
 import { ContentStage } from '../models/contentStage';
 import { QuestionSetStage } from '../models/questionSetStage';
 import { QuestionStage } from '../models/questionStage';
+import { destroyAudio, destroyAudioMapping, handleAudioData } from './audio';
+import { AudioStage } from '../models/audioStage';
 
 const { csvFileName, fileUploadInterval, reCheckProcessInterval, bulkUploadFolder } = appConfiguration;
 let fileName: string;
@@ -266,6 +268,7 @@ const handleCSVFiles = async (csvFiles: { entryName: string }[]) => {
           break;
       }
     }
+
     logger.info(`Content Validate::csv Data validation initiated for contents`);
     const contentsCsv = await handleContentCsv(validCSVData.contents, mediaEntries, processId);
     if (!contentsCsv?.result?.isValid) {
@@ -274,8 +277,9 @@ const handleCSVFiles = async (csvFiles: { entryName: string }[]) => {
       await destroyContent();
       return contentsCsv;
     }
+
     logger.info(`Question Validate::csv Data validation initiated for question`);
-    const questionsCsv = await handleQuestionCsv(validCSVData.questions, mediaEntries, processId);
+    const { meta: questionsCsv, stageData: questionStageData } = await handleQuestionCsv(validCSVData.questions, mediaEntries, processId);
     if (!questionsCsv?.result?.isValid) {
       logger.error(questionsCsv?.error?.errMsg);
       await destroyContent();
@@ -296,11 +300,29 @@ const handleCSVFiles = async (csvFiles: { entryName: string }[]) => {
       await destroyQuestionSet();
       await QuestionSetStage.destroy({ where: { process_id: processId } });
       return questionSetsCsv;
+    }
+
+    logger.info(`Audio Validate::csv Data validation initiated for audio`);
+    const audioCsv = await handleAudioData(questionStageData, processId);
+    if (!audioCsv?.result?.isValid) {
+      logger.error(audioCsv?.error?.errMsg);
+      await destroyContent();
+      await ContentStage.destroy({ where: { process_id: processId } });
+      await destroyQuestion();
+      await QuestionStage.destroy({ where: { process_id: processId } });
+      await destroyQuestionSet();
+      await QuestionSetStage.destroy({ where: { process_id: processId } });
+      await destroyAudio();
+      await destroyAudioMapping();
+      await AudioStage.destroy({ where: { process_id: processId } });
+      return audioCsv;
     } else {
       await ContentStage.truncate({ restartIdentity: true });
       await QuestionStage.truncate({ restartIdentity: true });
       await QuestionSetStage.truncate({ restartIdentity: true });
+      await AudioStage.truncate({ restartIdentity: true });
     }
+
     return { error: { errStatus: null, errMsg: null }, result: { isValid: true, data: null } };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Error during upload validation csv data,please re upload the zip file for the new process';
