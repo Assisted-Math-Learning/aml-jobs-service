@@ -240,6 +240,16 @@ export const processRow = (rows: any) => {
           if (cellValueTokens.length !== 2 || cellValueTokens[0].toLowerCase() !== 'option' || Number.isNaN(+cellValueTokens[1])) {
             errMsg = 'Invalid value format for mcq_correct_options column :: should be Option<space><option-number>';
           }
+
+          if (!errMsg) {
+            const optionHeaders = ['mcq_option_1', 'mcq_option_2', 'mcq_option_3', 'mcq_option_4', 'mcq_option_5', 'mcq_option_6'];
+            const options = optionHeaders.map((option: any) => row[option]).filter((v) => !!v);
+            const cellValueTokens = cellValue.trim().split(' ');
+            const correctOptionNumber = +cellValueTokens[1];
+            if (correctOptionNumber > options.length) {
+              errMsg = `Invalid value for mcq_correct_options column :: Options: ${options.join(', ')}`;
+            }
+          }
         }
 
         // Add fields matching the mcq, fib, grid, n1, n2 pattern to body

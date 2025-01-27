@@ -654,66 +654,92 @@ const getAnswer = (skill: string, question_type: string, bodyObject: any) => {
   }
 };
 
+const getCarryValues = (n1: string, n2: string) => {
+  const maxLength = Math.max(n1.length, n2.length);
+  const n1Str = n1.padStart(maxLength, '0');
+  const n2Str = n2.padStart(maxLength, '0');
+
+  let i = maxLength - 1;
+  const carries = [];
+  let lastCarry = 0;
+  while (i > 0) {
+    const num1 = +n1Str[i];
+    const num2 = +n2Str[i];
+    if (num1 + num2 + lastCarry > 9) {
+      carries.unshift(1);
+      lastCarry = 1;
+    } else {
+      lastCarry = 0;
+      carries.unshift(0);
+    }
+    i--;
+  }
+
+  return carries;
+};
+
 const addGrid1Answer = (input: any) => {
   const { grid_fib_n1, grid_fib_n2, grid1_pre_fills_top, grid1_pre_fills_result, grid1_show_carry } = input;
 
-  const maxLength = Math.max(grid_fib_n1.length, grid_fib_n2.length);
-  const n1Str = grid_fib_n1.padStart(maxLength, '0');
-  const n2Str = grid_fib_n2.padStart(n1Str.length, '0');
-  const maxLengthTwoNumber = Math.max(grid_fib_n1.length, grid_fib_n2.length);
-  let answerTop = '';
-  let answerResult = '';
-  const isPrefil = grid1_show_carry === 'yes';
+  const n1 = parseInt(grid_fib_n1);
+  const n2 = parseInt(grid_fib_n2);
 
-  const result = parseInt(n1Str) + parseInt(n2Str);
-
+  const result = n1 + n2;
   const resultStr = result.toString();
+  let isPrefil = grid1_show_carry === 'yes';
+  let errorMsg = '';
+  let answerResult = '';
 
-  const updatedPrefilResult = grid1_pre_fills_result + 'B'.repeat(resultStr.length - grid1_pre_fills_result.length);
+  const carries = getCarryValues(grid_fib_n1, grid_fib_n2);
+  const validCarries = carries.filter((v) => !!v);
+
+  if (validCarries.length !== grid1_pre_fills_top.length) {
+    errorMsg = 'Incorrect grid1_pre_fills_top';
+  }
+
+  if (resultStr.length !== grid1_pre_fills_result.length) {
+    errorMsg = 'Incorrect grid1_pre_fills_result';
+  }
+
+  if (errorMsg) {
+    const errorContext = `grid_fib_n1 = ${grid_fib_n1} & grid_fib_n2 = ${grid_fib_n2}`;
+    throw new Error(`${errorMsg} :: ${errorContext}`);
+  }
+
+  const answerTop: string[] = carries.map((val) => (val === 0 ? '#' : '1'));
+
+  if (isPrefil) {
+    isPrefil = !answerTop.every((item: string) => item === '#');
+  }
+
+  if (isPrefil) {
+    const fillableIndicesOfAnswerTop = answerTop.reduce((agg: number[], curr, index) => {
+      if (curr !== '#') {
+        agg.push(index);
+      }
+      return agg;
+    }, []);
+
+    for (let i = 0; i < fillableIndicesOfAnswerTop.length; i++) {
+      const indexOfAnswerTop = fillableIndicesOfAnswerTop[i];
+      if (grid1_pre_fills_top[i] === 'B') {
+        answerTop[indexOfAnswerTop] = 'B';
+      }
+    }
+  }
 
   for (let i = resultStr.length - 1; i >= 0; i--) {
-    if (updatedPrefilResult[i] === 'B') {
+    if (grid1_pre_fills_result[i] === 'B') {
       answerResult += 'B';
     } else {
       answerResult += resultStr[i];
     }
   }
 
-  if (isPrefil) {
-    let carry = 0;
-    let carryString = '';
-    for (let i = maxLengthTwoNumber - 1; i >= 0; i--) {
-      const sum = parseInt(n1Str[i]) + parseInt(n2Str[i]) + carry;
-      carry = Math.floor(sum / 10);
-      carryString = carry.toString() + carryString;
-    }
-    if (carryString[0] === '0') carryString = carryString.slice(1);
-    carryString.replace(/0/g, '#');
-    let mapIndex = 0;
-
-    for (let i = 0; i < carryString.length; i++) {
-      if (_.isEmpty(grid1_pre_fills_top)) {
-        answerTop = 'B'.repeat(n1Str.length);
-        break;
-      }
-      if (carryString[i] === '1') {
-        if (grid1_pre_fills_top[mapIndex] === 'F') {
-          answerTop += '1';
-        } else if (grid1_pre_fills_top[mapIndex] === 'B') {
-          answerTop += 'B';
-        }
-        mapIndex++;
-      } else {
-        answerTop += '#';
-      }
-    }
-  } else {
-    answerTop = 'B'.repeat(n1Str.length);
-  }
   return {
     result: parseInt(resultStr),
     isPrefil,
-    answerTop,
+    answerTop: answerTop.join(''),
     answerResult: answerResult.split('').reverse().join(''),
   };
 };
