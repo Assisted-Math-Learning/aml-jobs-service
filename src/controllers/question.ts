@@ -21,34 +21,40 @@ export const handleQuestionCsv = async (questionsCsv: object[], media: any, proc
   if (questionsCsv.length === 0) {
     logger.error(`${processId} Question data validation resulted in empty data.`);
     return {
-      error: { errStatus: 'Empty', errMsg: 'empty question data found' },
-      result: {
-        isValid: false,
-        data: null,
+      meta: {
+        error: { errStatus: 'Empty', errMsg: 'empty question data found' },
+        result: {
+          isValid: false,
+          data: null,
+        },
       },
+      stageData: [],
     };
   }
 
   for (const questions of questionsCsv) {
     const validQuestionHeader = await validateCSVQuestionHeaderRow(questions);
-    if (!validQuestionHeader?.result?.isValid) return validQuestionHeader;
+    if (!validQuestionHeader?.result?.isValid) return { meta: validQuestionHeader, stageData: [] };
     const {
       result: { data },
     } = validQuestionHeader;
 
     const validQuestionRows = processQuestionRows(data?.rows);
-    if (!validQuestionRows?.result?.isValid) return validQuestionRows;
+    if (!validQuestionRows?.result?.isValid) return { meta: validQuestionRows, stageData: [] };
     const { result } = validQuestionRows;
 
     questionsData = questionsData.concat(result.data);
     if (questionsData?.length === 0) {
       logger.error('Error while processing the question csv data');
       return {
-        error: { errStatus: 'Empty', errMsg: 'empty question data found' },
-        result: {
-          isValid: false,
-          data: null,
+        meta: {
+          error: { errStatus: 'Empty', errMsg: 'empty question data found' },
+          result: {
+            isValid: false,
+            data: null,
+          },
         },
+        stageData: [],
       };
     }
   }
@@ -73,13 +79,13 @@ export const handleQuestionCsv = async (questionsCsv: object[], media: any, proc
 
   logger.info('Insert question Stage::Questions Data ready for bulk insert');
   const createQuestions = await bulkInsertQuestionStage(questionsDataForStage);
-  if (!createQuestions?.result?.isValid) return createQuestions;
+  if (!createQuestions?.result?.isValid) return { meta: createQuestions, stageData: [] };
 
   const validateQuestions = await validateStagedQuestionData();
   if (!validateQuestions?.result?.isValid) {
     const uploadQuestion = await uploadErroredQuestionsToCloud();
-    if (!uploadQuestion?.result?.isValid) return uploadQuestion;
-    return validateQuestions;
+    if (!uploadQuestion?.result?.isValid) return { meta: uploadQuestion, stageData: [] };
+    return { meta: validateQuestions, stageData: [] };
   }
 
   await updateProcess(processId, { status: Status.VALIDATED });
@@ -88,10 +94,10 @@ export const handleQuestionCsv = async (questionsCsv: object[], media: any, proc
   const questionsMedia = await processQuestionMediaFiles();
   if (!questionsMedia?.result?.isValid) {
     logger.error('Error while validating stage question table');
-    return questionsMedia;
+    return { meta: questionsMedia, stageData: [] };
   }
   const insertedMainQuestions = await insertMainQuestions();
-  return insertedMainQuestions;
+  return { meta: insertedMainQuestions, stageData: questionsDataForStage };
 };
 
 const validateCSVQuestionHeaderRow = async (questionEntry: any) => {

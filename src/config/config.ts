@@ -29,7 +29,7 @@ const appConfiguration: IConfiguration = {
     'division-question.csv,multiply-question.csv,addition-question.csv,subtraction-question.csv,media,division-questionSet.csv,multiply-questionSet.csv,addition-questionSet.csv,subtraction-questionSet.csv,division-content.csv,multiply-content.csv,addition-content.csv,subtraction-content.csv',
   ).split(','),
   presignedUrlExpiry: get(envVars, 'PRESIGNED_URL_EXPIRY_TIME', 600) as number,
-  processInterval: get(envVars, 'PROCESS_INTERVAL', 300000) as number,
+  processInterval: get(envVars, 'PROCESS_INTERVAL', 5) as number,
   reCheckProcessInterval: get(envVars, 'RE_CHECK_PROCESS_INTERVAL', 4) as number, //hours
   fileUploadInterval: get(envVars, 'FILE_UPLOAD_INTERVAL', 4) as number, //hours
   grid1AddFields: get(envVars, 'GRID-1_ADD_FIELDS', 'grid1_show_carry,grid_fib_n1,grid_fib_n2').split(','),
@@ -59,6 +59,7 @@ const appConfiguration: IConfiguration = {
     'REQUIRED_META_FIELDS',
     'l1_skill,l2_skill,class,board,sequence,question_type,repository_name,benchmark_time,identifier,process_id,content_id,QID,question_set_id',
   ).split(','),
+  tts_api_url: get(envVars, 'TTS_API_URL', 'https://admin.models.ai4bharat.org/inference/convert'),
 };
 
 export default appConfiguration;
