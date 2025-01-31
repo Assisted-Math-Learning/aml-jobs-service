@@ -699,7 +699,7 @@ const addGrid1Answer = (input: any) => {
   const carries = getCarryValues(grid_fib_n1, grid_fib_n2);
   const validCarries = carries.filter((v) => !!v);
 
-  if (validCarries.length !== grid1_pre_fills_top.length) {
+  if (isPrefil && validCarries.length !== grid1_pre_fills_top.length) {
     errorMsg = 'Incorrect grid1_pre_fills_top';
   }
 
